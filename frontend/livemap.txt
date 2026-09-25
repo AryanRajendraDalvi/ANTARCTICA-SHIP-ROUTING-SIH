@@ -1,0 +1,182 @@
+function LiveMap({
+  vessels, icebergs, routes, forecastGeoJSON, zoom = 3.5,
+  center = [68.0, -66.0] as [number, number]
+}: {
+  vessels?: Vessel[];
+  icebergs?: Iceberg[];
+  routes?: Route[];
+  forecastGeoJSON?: any;
+  zoom?: number;
+  center?: [number, number];
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const inst = useRef<maplibregl.Map | null>(null);
+  const markersRef = useRef<maplibregl.Marker[]>([]);
+
+  useEffect(() => {
+    if (inst.current || !ref.current) return;
+    const map = new maplibregl.Map({
+      container: ref.current,
+      style: {
+        version: 8,
+        sources: { sat: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256 } },
+        layers: [{ id: 'sat', type: 'raster', source: 'sat' }]
+      },
+      center, zoom,
+    });
+    inst.current = map;
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+
+    map.on('load', () => {
+      // Forecast SIC heatmap source
+      map.addSource('sic-forecast', {
+        type: 'geojson',
+        data: forecastGeoJSON || { type: 'FeatureCollection', features: [] }
+      });
+      map.addLayer({
+        id: 'sic-heat', type: 'heatmap', source: 'sic-forecast',
+        paint: {
+          'heatmap-weight': ['get', 'sic'],
+          'heatmap-intensity': 1.2,
+          'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'],
+            0, 'rgba(255,255,255,0)', 0.3, '#60a5fa', 0.6, '#fde047', 1.0, '#dc2626'],
+          'heatmap-radius': 45,
+          'heatmap-opacity': 0.7
+        }
+      });
+
+      // Route sources (3 routes)
+      ['eco', 'fast', 'safe'].forEach(type => {
+        const colors: Record<string, string> = { eco: '#22c55e', fast: '#ef4444', safe: '#3b82f6' };
+        map.addSource(`route-${type}`, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        map.addLayer({
+          id: `route-${type}-line`, type: 'line', source: `route-${type}`,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': colors[type],
+            'line-width': 3,
+            'line-dasharray': type === 'eco' ? [1] : [3, 2],
+            'line-opacity': 0.9
+          }
+        });
+      });
+
+      // Iceberg Source (Native layer for performance instead of 250+ DOM nodes)
+      map.addSource('icebergs', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({
+        id: 'icebergs-layer', type: 'circle', source: 'icebergs',
+        paint: {
+          'circle-radius': ['match', ['get', 'risk'], 'High', 5, 'Medium', 3.5, 2.5],
+          'circle-color': ['match', ['get', 'risk'], 'High', '#ef4444', 'Medium', '#f97316', '#e2e8f0'],
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#ffffff'
+        }
+      });
+
+      // Iceberg popups
+      map.on('click', 'icebergs-layer', (e) => {
+        const props = e.features?.[0]?.properties;
+        if (!props) return;
+        new maplibregl.Popup()
+          .setLngLat(e.lngLat)
+          .setHTML(`<div class="p-2 text-xs"><div class="font-bold">${props.id}</div><div>Size: ${props.size_cat} (${props.size_km} km)</div><div>Drift: ${props.drift_speed_kn} kn @ ${props.drift_dir_deg}°</div><div class="mt-1 font-bold text-${props.risk === 'High' ? 'red' : 'orange'}-600">Risk: ${props.risk}</div></div>`)
+          .addTo(map);
+      });
+      map.on('mouseenter', 'icebergs-layer', () => map.getCanvas().style.cursor = 'pointer');
+      map.on('mouseleave', 'icebergs-layer', () => map.getCanvas().style.cursor = '');
+    });
+
+    return () => { map.remove(); inst.current = null; };
+  }, []);
+
+  // Update heatmap when forecastGeoJSON changes
+  useEffect(() => {
+    const map = inst.current;
+    if (!map || !forecastGeoJSON) return;
+    const waitForLoad = () => {
+      if (!map.isStyleLoaded()) { setTimeout(waitForLoad, 200); return; }
+      const src = map.getSource('sic-forecast') as maplibregl.GeoJSONSource;
+      if (src) src.setData(forecastGeoJSON);
+    };
+    waitForLoad();
+  }, [forecastGeoJSON]);
+
+  // Update routes on map
+  useEffect(() => {
+    const map = inst.current;
+    if (!map || !routes) return;
+    const waitForLoad = () => {
+      if (!map.isStyleLoaded()) { setTimeout(waitForLoad, 200); return; }
+      routes.forEach(route => {
+        const src = map.getSource(`route-${route.type}`) as maplibregl.GeoJSONSource;
+        if (!src) return;
+        const coords = route.waypoints.map(wp => [wp.lon, wp.lat]);
+        src.setData({
+          type: 'FeatureCollection',
+          features: [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } }]
+        });
+      });
+    };
+    waitForLoad();
+  }, [routes]);
+
+  // Update vessel markers
+  useEffect(() => {
+    const map = inst.current;
+    if (!map || !vessels) return;
+    const waitForLoad = () => {
+      if (!map.isStyleLoaded()) { setTimeout(waitForLoad, 200); return; }
+      markersRef.current.forEach(m => m.remove());
+      markersRef.current = [];
+
+      vessels.forEach(v => {
+        const el = document.createElement('div');
+        el.className = 'w-4 h-4 rounded-full border-2 border-white shadow-lg cursor-pointer';
+        el.style.backgroundColor = v.color;
+
+        const popup = new maplibregl.Popup({ offset: 15, closeButton: false })
+          .setHTML(`
+            <div class="p-2 text-xs">
+              <div class="font-bold text-slate-800">${v.name}</div>
+              <div class="text-slate-500">${v.type}</div>
+              <div class="mt-1 space-y-0.5 text-slate-700">
+                <div>Lat: ${v.lat}° Lon: ${v.lon}°</div>
+                <div>Speed: ${v.speed_kn} kn | Hdg: ${v.heading_deg}°</div>
+                <div>Status: <span class="text-green-600 font-bold">${v.status}</span></div>
+              </div>
+            </div>
+          `);
+        const marker = new maplibregl.Marker({ element: el })
+          .setLngLat([v.lon, v.lat])
+          .setPopup(popup)
+          .addTo(map);
+        markersRef.current.push(marker);
+      });
+    };
+    waitForLoad();
+  }, [vessels]);
+
+  // Update iceberg markers via Native WebGL Layer
+  useEffect(() => {
+    const map = inst.current;
+    if (!map || !icebergs) return;
+    const waitForLoad = () => {
+      if (!map.isStyleLoaded()) { setTimeout(waitForLoad, 200); return; }
+      const src = map.getSource('icebergs') as maplibregl.GeoJSONSource;
+      if (src) {
+        src.setData({
+          type: 'FeatureCollection',
+          features: icebergs.map(b => ({
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [b.lon, b.lat] },
+            properties: b
+          }))
+        });
+      }
+    };
+    waitForLoad();
+  }, [icebergs]);
+
+  return <div ref={ref} className="absolute inset-0 w-full h-full bg-slate-800" />;
+}
+
