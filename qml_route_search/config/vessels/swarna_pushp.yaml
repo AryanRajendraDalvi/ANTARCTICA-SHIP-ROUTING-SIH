@@ -1,0 +1,29 @@
+name: "Swarna Pushp"
+imo: "9432672"
+type: "MR2 Product Tanker"
+loa_m: 184.95
+beam_m: 32.23
+draft_design_m: 12.32
+draft_max_m: 12.32
+dwt_mt: 47795
+depth_m: 18.2
+service_speed_kn: 14.5
+eco_speed_kn: 12.5
+engine:
+  model: "MAN B&W 6S50MC-C"
+  type: "Main"
+  mcr_kw: 9480
+  ncr_kw: 8058
+  rpm_mcr: 127
+sfoc_curve:
+  25: 192
+  50: 174
+  75: 166
+  85: 165
+  100: 170
+roll:
+  gm_loaded_m: 3.20
+  gm_ballast_m: 5.50
+  t_roll_loaded_s: 13.1
+  t_roll_ballast_s: 10.0
+  k_xx_factor: 0.38

@@ -1,0 +1,29 @@
+name: "SCI Panna"
+imo: "9524889"
+type: "AHTS/OSV"
+loa_m: 64.8
+beam_m: 15.7
+draft_design_m: 5.81
+draft_max_m: 5.81
+dwt_mt: 1997
+depth_m: 7.0
+service_speed_kn: 12.5
+eco_speed_kn: 11.0
+engine:
+  model: "2x MaK 8M25"
+  type: "Main"
+  mcr_kw: 4800
+  ncr_kw: 4080
+  rpm_mcr: 750
+sfoc_curve:
+  25: 216
+  50: 194
+  75: 185
+  85: 183
+  100: 187
+roll:
+  gm_loaded_m: 1.25
+  gm_ballast_m: 2.10
+  t_roll_loaded_s: 9.8
+  t_roll_ballast_s: 7.6
+  k_xx_factor: 0.36

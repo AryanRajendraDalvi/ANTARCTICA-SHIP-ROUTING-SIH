@@ -1,0 +1,29 @@
+name: "Vishva Vijeta"
+imo: "9621699"
+type: "Supramax Bulk"
+loa_m: 190.0
+beam_m: 32.26
+draft_design_m: 12.8
+draft_max_m: 12.8
+dwt_mt: 56800
+depth_m: 18.0
+service_speed_kn: 14.0
+eco_speed_kn: 12.0
+engine:
+  model: "Wartsila 6RT-flex50"
+  type: "Main"
+  mcr_kw: 9480
+  ncr_kw: 8058
+  rpm_mcr: 124
+sfoc_curve:
+  25: 185
+  50: 168
+  75: 164
+  85: 164
+  100: 169
+roll:
+  gm_loaded_m: 2.50
+  gm_ballast_m: 4.20
+  t_roll_loaded_s: 15.3
+  t_roll_ballast_s: 11.8
+  k_xx_factor: 0.38

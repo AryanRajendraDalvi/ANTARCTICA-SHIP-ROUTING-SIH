@@ -1,0 +1,29 @@
+name: "INS Deepak"
+imo: "A50"
+type: "Naval Fleet Replenishment"
+loa_m: 175.0
+beam_m: 25.0
+draft_design_m: 9.1
+draft_max_m: 9.1
+dwt_mt: 27550
+depth_m: 14.0
+service_speed_kn: 20.0
+eco_speed_kn: 16.0
+engine:
+  model: "2x MAN 14V32/44CR"
+  type: "Main"
+  mcr_kw: 19200
+  ncr_kw: 16320
+  rpm_mcr: null
+sfoc_curve:
+  25: 195
+  50: 178
+  75: 174
+  85: 172
+  100: 177
+roll:
+  gm_loaded_m: 1.80
+  gm_ballast_m: 3.20
+  t_roll_loaded_s: 13.25
+  t_roll_ballast_s: 10.0
+  k_xx_factor: 0.38

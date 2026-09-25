@@ -1,0 +1,110 @@
+# QML Route Search Pipeline - Configuration
+# All constants from QML_Route_Search_Technical_Specification.docx
+
+# --- Data Paths ---
+data:
+  gebco_path: "../GEBCO_15_Aug_2026_ac6c6a430fde/gebco_2026_n18.445_s-36.867_w54.711_e116.586_geotiff.tif"
+  gshhg_path: "../GSHHS_i_L1.shp"
+  era5_oper_path: "../ba1fa283adfc139deb3199b360eb4af0/data_stream-oper_stepType-instant.nc"
+  era5_wave_path: "../ba1fa283adfc139deb3199b360eb4af0/data_stream-wave_stepType-instant.nc"
+  model_checkpoint: "checkpoints/qml_cost_model.pt"
+
+# --- Bounding Box (Indian Ocean Region) ---
+region:
+  lon_min: 54.0
+  lon_max: 117.0
+  lat_min: -37.0
+  lat_max: 19.0
+
+# --- Quantum Circuit (§3.2-3.3) ---
+quantum:
+  n_qubits: 15
+  n_layers: 4  # L = 4 variational layers
+  measured_qubits: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  unmeasured_qubits: [10, 11, 12, 13, 14]
+  device: "lightning.qubit"
+  diff_method: "backprop"
+
+# --- Adapter Layer (§3.1) ---
+adapter:
+  input_dim: 98   # 96-D fusion + 2 encounter angle features
+  output_dim: 15  # maps to n_qubits
+
+# --- Readout Scaling Constants (§3.4) ---
+# Set to 99th percentile of training labels
+readout:
+  F_max: 150.0       # kg/NM — fuel burn rate ceiling
+  R_max: 800.0       # kN — wave resistance ceiling
+  DV_max: 8.0         # kn — speed loss ceiling
+  S_max: 500.0        # kN — slamming force ceiling
+  R_wind_max: 300.0   # kN — windage resistance ceiling
+  a_max: 2.5          # m/s² RMS — vertical acceleration ceiling
+
+# --- Training (§4.2-4.3) ---
+training:
+  lr: 0.001
+  batch_size: 256
+  patience: 15
+  lambda_weight: 1.0  # tuned on validation split
+  optimizer: "adam"
+  scheduler: "cosine"
+  max_epochs: 200
+
+# --- Static Filter (§5.1) ---
+static_filter:
+  margin_safety_m: 3.0       # default UKC safety margin
+  sample_interval_nm: 5.0    # great-circle arc sampling
+  cache_path: "cache/static_filter.pkl"
+
+# --- Dynamic Filter (§5.2) ---
+dynamic_filter:
+  hs_threshold: 8.0          # m — significant wave height
+  wind_threshold: 25.7        # m/s (50 kn)
+
+# --- Search Engine (§6) ---
+search:
+  heading_fan_deg: 60         # ±60° from destination bearing
+  heading_step_deg: 15        # every 15° within fan
+  dt_hours: 6                 # propagation time step
+  capture_radius_nm: 10       # destination capture radius
+  waypoint_spacing_nm: 30     # approximate node spacing
+  max_iterations: 500         # safety bound on search loop
+  confidence_caution_margin: 0.3  # inflate risk for low-confidence
+
+# --- Safety & Compliance (§7) ---
+safety:
+  # Parametric Roll (§7.1)
+  hs_roll_threshold: 4.0     # m — minimum Hs for roll check
+  roll_resonance_low: 0.8    # T_enc / T_roll lower bound
+  roll_resonance_high: 1.2   # T_enc / T_roll upper bound
+  following_sector_deg: [0, 45, 135, 180]  # following/quartering sectors
+
+  # Comfort (§7.2)
+  comfort_speed_step_kn: 1.0 # speed reduction step
+  min_safe_speed_kn: 4.0     # absolute floor
+
+  # Emissions (§7.3)
+  hfo_co2_factor: 3.114      # kg CO₂ per kg HFO
+
+# --- Rolling Horizon (§8) ---
+rerouting:
+  replan_interval_hours: 6
+  position_drift_nm: 10.0    # AIS drift trigger
+
+# --- Indian Ports ---
+ports:
+  mumbai: { lat: 18.9496, lon: 72.8356, name: "Mumbai (JNPT)" }
+  chennai: { lat: 13.0827, lon: 80.2707, name: "Chennai" }
+  kochi: { lat: 9.9312, lon: 76.2673, name: "Kochi" }
+  visakhapatnam: { lat: 17.6868, lon: 83.2185, name: "Visakhapatnam" }
+  kandla: { lat: 23.0333, lon: 70.2167, name: "Kandla" }
+  tuticorin: { lat: 8.7642, lon: 78.1348, name: "Tuticorin" }
+  paradip: { lat: 20.3167, lon: 86.6167, name: "Paradip" }
+  new_mangalore: { lat: 12.9141, lon: 74.8560, name: "New Mangalore" }
+  kolkata: { lat: 22.5726, lon: 88.3639, name: "Kolkata (Haldia)" }
+  mormugao: { lat: 15.4089, lon: 73.8001, name: "Mormugao (Goa)" }
+  singapore: { lat: 1.2644, lon: 103.8222, name: "Singapore" }
+  colombo: { lat: 6.9497, lon: 79.8428, name: "Colombo" }
+  dubai: { lat: 25.2760, lon: 55.2962, name: "Dubai (Jebel Ali)" }
+  aden: { lat: 12.7855, lon: 45.0187, name: "Aden" }
+  port_louis: { lat: -20.1609, lon: 57.5012, name: "Port Louis (Mauritius)" }
