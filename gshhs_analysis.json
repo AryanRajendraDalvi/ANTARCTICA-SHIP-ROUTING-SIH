@@ -1,0 +1,282 @@
+{
+  "file_path": "d:\\downloads\\SMART INDIA HACKATHON 2026\\GSHHS_i_L1.shp",
+  "file_size_bytes": 7284324,
+  "file_size_mb": 6.947,
+  "file_code": 9994,
+  "file_code_valid": true,
+  "header_file_length_bytes": 7284324,
+  "version": 1000,
+  "geometry_type": "Polygon",
+  "geometry_type_id": 5,
+  "crs_projection": {
+    "declared_in_prj": false,
+    "prj_content": "No .prj file present. GSHHG (Global Self-consistent, Hierarchical, High-resolution Geography Database) standard CRS is Geographic WGS84 (EPSG:4326), with coordinates in decimal degrees (Longitude/Latitude).",
+    "standard_crs": "WGS 84 (EPSG:4326)",
+    "coordinate_units": "Decimal Degrees (Longitude, Latitude)"
+  },
+  "bounding_box": {
+    "xmin_west_lon": -180.0,
+    "ymin_south_lat": -68.919814,
+    "xmax_east_lon": 180.0,
+    "ymax_north_lat": 83.633389
+  },
+  "z_range": [
+    0.0,
+    0.0
+  ],
+  "m_range": [
+    0.0,
+    0.0
+  ],
+  "feature_counts": {
+    "total_features": 32830,
+    "total_parts": 32830,
+    "total_vertices": 340359,
+    "min_points_per_feature": 4,
+    "max_points_per_feature": 34332,
+    "avg_points_per_feature": 10.37,
+    "min_parts_per_feature": 1,
+    "max_parts_per_feature": 1
+  },
+  "associated_files": {
+    ".dbf": {
+      "exists": false,
+      "size": 0
+    },
+    ".shx": {
+      "exists": false,
+      "size": 0
+    },
+    ".prj": {
+      "exists": false,
+      "size": 0
+    },
+    ".cpg": {
+      "exists": false,
+      "size": 0
+    },
+    ".sbn": {
+      "exists": false,
+      "size": 0
+    },
+    ".sbx": {
+      "exists": false,
+      "size": 0
+    },
+    ".shp.xml": {
+      "exists": false,
+      "size": 0
+    }
+  },
+  "attribute_schema": {
+    "note": "No .dbf file present in directory alongside .shp (standalone .shp geometry file)"
+  },
+  "regional_polygon_counts": {
+    "Indian Ocean Basin (30E-120E, 50S-30N)": {
+      "bounding_box": [
+        30.0,
+        -50.0,
+        120.0,
+        30.0
+      ],
+      "overlapping_polygons_count": 4714,
+      "sample_record_ids": [
+        1,
+        3,
+        6,
+        9,
+        10,
+        12,
+        17,
+        19,
+        23,
+        31
+      ]
+    },
+    "Arabian Sea region (50E-77.5E, 5N-26N)": {
+      "bounding_box": [
+        50.0,
+        5.0,
+        77.5,
+        26.0
+      ],
+      "overlapping_polygons_count": 348,
+      "sample_record_ids": [
+        1,
+        3,
+        146,
+        383,
+        432,
+        672,
+        1066,
+        1137,
+        1147,
+        1785
+      ]
+    },
+    "Bay of Bengal region (77.5E-100E, 5N-23N)": {
+      "bounding_box": [
+        77.5,
+        5.0,
+        100.0,
+        23.0
+      ],
+      "overlapping_polygons_count": 857,
+      "sample_record_ids": [
+        1,
+        12,
+        31,
+        236,
+        250,
+        255,
+        302,
+        352,
+        426,
+        457
+      ]
+    },
+    "India & Surrounding Subcontinent (65E-95E, 5N-38N)": {
+      "bounding_box": [
+        65.0,
+        5.0,
+        95.0,
+        38.0
+      ],
+      "overlapping_polygons_count": 587,
+      "sample_record_ids": [
+        1,
+        31,
+        236,
+        250,
+        255,
+        302,
+        352,
+        426,
+        502,
+        625
+      ]
+    }
+  },
+  "top_10_largest_polygons_by_vertices": [
+    {
+      "rec_num": 1,
+      "shape_type": 5,
+      "bbox": [
+        -9.500389,
+        1.2695,
+        180.0,
+        77.719583
+      ],
+      "num_parts": 1,
+      "num_points": 34332
+    },
+    {
+      "rec_num": 4,
+      "shape_type": 5,
+      "bbox": [
+        -168.132417,
+        7.204806,
+        -55.620806,
+        72.002139
+      ],
+      "num_parts": 1,
+      "num_points": 25378
+    },
+    {
+      "rec_num": 5,
+      "shape_type": 5,
+      "bbox": [
+        -81.328778,
+        -53.900444,
+        -34.793778,
+        12.4645
+      ],
+      "num_parts": 1,
+      "num_points": 9904
+    },
+    {
+      "rec_num": 7,
+      "shape_type": 5,
+      "bbox": [
+        -73.061639,
+        59.954556,
+        -12.142167,
+        83.633389
+      ],
+      "num_parts": 1,
+      "num_points": 7279
+    },
+    {
+      "rec_num": 6,
+      "shape_type": 5,
+      "bbox": [
+        113.152861,
+        -39.139583,
+        153.639583,
+        -10.688722
+      ],
+      "num_parts": 1,
+      "num_points": 6844
+    },
+    {
+      "rec_num": 3,
+      "shape_type": 5,
+      "bbox": [
+        -17.533778,
+        -34.830444,
+        51.415417,
+        37.349556
+      ],
+      "num_parts": 1,
+      "num_points": 6675
+    },
+    {
+      "rec_num": 11,
+      "shape_type": 5,
+      "bbox": [
+        -89.530833,
+        61.86275,
+        -61.26425,
+        73.735833
+      ],
+      "num_parts": 1,
+      "num_points": 4765
+    },
+    {
+      "rec_num": 8,
+      "shape_type": 5,
+      "bbox": [
+        130.930444,
+        -10.704611,
+        150.877083,
+        -0.338583
+      ],
+      "num_parts": 1,
+      "num_points": 2529
+    },
+    {
+      "rec_num": 21,
+      "shape_type": 5,
+      "bbox": [
+        -59.41225,
+        46.612278,
+        -52.621694,
+        51.631222
+      ],
+      "num_parts": 1,
+      "num_points": 1808
+    },
+    {
+      "rec_num": 9,
+      "shape_type": 5,
+      "bbox": [
+        108.844583,
+        -4.184611,
+        119.274639,
+        7.034528
+      ],
+      "num_parts": 1,
+      "num_points": 1659
+    }
+  ]
+}

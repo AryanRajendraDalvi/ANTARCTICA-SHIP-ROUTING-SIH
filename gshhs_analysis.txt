@@ -1,0 +1,41 @@
+======================================================================
+GSHHG SHORELINE SHAPEFILE ANALYSIS REPORT
+======================================================================
+File: d:\downloads\SMART INDIA HACKATHON 2026\GSHHS_i_L1.shp
+File Size: 7,284,324 bytes (6.95 MB)
+Shapefile Format Valid: YES (Code 9994)
+Geometry Type: Polygon (Type ID: 5)
+Total Number of Features / Polygons: 32,830
+Total Parts: 32,830
+Total Vertices / Points: 340,359
+
+--- COORDINATE REFERENCE SYSTEM (CRS) & EXTENT ---
+Standard Projection: WGS 84 (EPSG:4326) - Geographic Lat/Lon
+.prj file present: No (Standard GSHHG EPSG:4326 assumed)
+Global Bounding Box Extent:
+  Longitude (X): [-180.000000°, 180.000000°] (West to East)
+  Latitude  (Y): [-68.919814°, 83.633389°] (South to North)
+
+--- ATTRIBUTE COLUMNS / DBF SCHEMA ---
+.dbf file present: No (.shp standalone)
+  Note: GSHHG Level 1 shapefile contains purely shoreline vector geometry.
+  Standard GSHHG attributes in full distributions include ID, Level (1=land/ocean), Source, Area (km²).
+
+--- REGIONAL ANALYSIS (INDIAN OCEAN / ARABIAN SEA / BAY OF BENGAL) ---
+• Indian Ocean Basin (30E-120E, 50S-30N):
+    Bounding Box: Lon [30.0° to 120.0°], Lat [-50.0° to 30.0°]
+    Overlapping Shoreline Polygons / Landmass Features: 4,714
+• Arabian Sea region (50E-77.5E, 5N-26N):
+    Bounding Box: Lon [50.0° to 77.5°], Lat [5.0° to 26.0°]
+    Overlapping Shoreline Polygons / Landmass Features: 348
+• Bay of Bengal region (77.5E-100E, 5N-23N):
+    Bounding Box: Lon [77.5° to 100.0°], Lat [5.0° to 23.0°]
+    Overlapping Shoreline Polygons / Landmass Features: 857
+• India & Surrounding Subcontinent (65E-95E, 5N-38N):
+    Bounding Box: Lon [65.0° to 95.0°], Lat [5.0° to 38.0°]
+    Overlapping Shoreline Polygons / Landmass Features: 587
+
+--- GSHHS HIERARCHY CONTEXT ---
+GSHHS Level 1 (L1) = Continental landmasses and ocean islands (shorelines separating ocean from land).
+Intermediate resolution ('i') = ~1 km shoreline accuracy, optimal for regional ocean routing & bathymetry masking.
+======================================================================

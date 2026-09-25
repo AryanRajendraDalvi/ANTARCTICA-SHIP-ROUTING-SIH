@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MERIDIAN — QML Route Command</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root{
+  --abyss:#030711;
+  --panel:#081521;
+  --panel-glass:rgba(8,21,33,0.82);
+  --line:#123246;
+  --line-bright:#1c4a63;
+  --teal:#2de1c2;
+  --teal-dim:#17756a;
+  --amber:#ffb238;
+  --danger:#ff4757;
+  --text:#d8eef2;
+  --text-dim:#6f93a0;
+  --text-faint:#3d5866;
+  --mono:'JetBrains Mono', monospace;
+  --disp:'Big Shoulders Display', sans-serif;
+  --body:'Inter', sans-serif;
+}
+body.theme-light{
+  --abyss:#e9f0ee;
+  --panel:#f4f7f6;
+  --panel-glass:rgba(238,244,242,0.88);
+  --line:#c3d3d0;
+  --line-bright:#9db4b0;
+  --teal:#0f8f7c;
+  --teal-dim:#0c6a5c;
+  --amber:#b9700a;
+  --danger:#c93a45;
+  --text:#0e2a28;
+  --text-dim:#43625e;
+  --text-faint:#7a938f;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{width:100%; height:100%; overflow:hidden; background:var(--abyss); font-family:var(--body); color:var(--text); transition:background .4s;}
+#scene{position:fixed; inset:0; z-index:0;}
+
+/* ---------- vignette atmosphere ---------- */
+#atmosphere{position:fixed; inset:0; z-index:1; pointer-events:none;
+  background: radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(3,7,17,0.55) 100%);
+}
+body.theme-light #atmosphere{
+  background: radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(20,40,38,0.18) 100%);
+}
+
+/* ---------- top bar ---------- */
+#topbar{position:fixed; top:0; left:0; right:0; z-index:10; height:64px;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 22px; background:linear-gradient(180deg, rgba(3,7,17,0.95), rgba(3,7,17,0.55));
+  border-bottom:1px solid var(--line);}
+.brand{display:flex; align-items:baseline; gap:10px;}
+.brand .mark{font-family:var(--disp); font-weight:800; font-size:22px; letter-spacing:1px; color:var(--text);}
+.brand .mark span{color:var(--teal);}
+.brand .sub{font-family:var(--mono); font-size:10px; letter-spacing:2px; color:var(--text-dim); text-transform:uppercase;}
+#modeToggle{display:flex; border:1px solid var(--line-bright); border-radius:3px; overflow:hidden;}
+#modeToggle button{font-family:var(--mono); font-size:11px; letter-spacing:1.5px; padding:8px 16px;
+  background:transparent; border:none; color:var(--text-dim); cursor:pointer; transition:all .2s;}
+#modeToggle button.active{background:var(--teal); color:#031017; font-weight:700;}
+#modeToggle button:not(.active):hover{background:rgba(45,225,194,0.08); color:var(--teal);}
+#connStatus{display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:10.5px; letter-spacing:1.5px; text-transform:uppercase;}
+#connStatus .dot{width:8px; height:8px; border-radius:50%; background:var(--text-faint); transition:background .3s;}
+#connStatus.connecting .dot{background:var(--amber); animation:pulse 1s infinite;}
+#connStatus.online .dot{background:var(--teal); box-shadow:0 0 8px var(--teal); animation:pulse 2s infinite;}
+#connStatus.offline .dot{background:var(--danger); animation:pulse 1s infinite;}
+#connStatus.demo .dot{background:var(--amber);}
+@keyframes pulse{0%,100%{opacity:1;} 50%{opacity:.35;}}
+
+/* ---------- side panels ---------- */
+.panel{position:fixed; z-index:8; background:var(--panel-glass); border:1px solid var(--line);
+  backdrop-filter:blur(6px); border-radius:2px;}
+.panel h3{font-family:var(--disp); font-weight:700; font-size:13px; letter-spacing:2px; text-transform:uppercase;
+  color:var(--text-dim); padding:10px 14px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center;}
+.panel h3 .n{color:var(--teal); font-family:var(--mono); font-size:10px;}
+.field{padding:10px 14px; border-bottom:1px solid var(--line);}
+.field label{display:block; font-family:var(--mono); font-size:9.5px; letter-spacing:1.5px; color:var(--text-faint); text-transform:uppercase; margin-bottom:5px;}
+.field input[type=text], .field input[type=number]{width:100%; background:rgba(255,255,255,0.03); border:1px solid var(--line-bright);
+  color:var(--text); font-family:var(--mono); font-size:11.5px; padding:6px 8px; border-radius:2px;}
+.field input:focus{outline:none; border-color:var(--teal);}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.btn{font-family:var(--mono); font-size:11px; letter-spacing:1px; text-transform:uppercase; padding:9px 12px;
+  background:transparent; border:1px solid var(--line-bright); color:var(--text); cursor:pointer; border-radius:2px;
+  width:100%; transition:all .15s; text-align:center;}
+.btn:hover{border-color:var(--teal); color:var(--teal); background:rgba(45,225,194,0.06);}
+.btn.primary{background:var(--teal); color:#031017; border-color:var(--teal); font-weight:700;}
+.btn.primary:hover{background:#3af0d1;}
+.btn.danger{border-color:var(--danger); color:var(--danger);}
+.btn.danger:hover{background:rgba(255,71,87,0.08);}
+.btn.small{font-size:10px; padding:6px 10px;}
+
+/* ---------- onshore left: config + fleet ---------- */
+#onshoreLeft{top:80px; left:16px; width:270px; max-height:calc(100vh - 190px); overflow-y:auto;}
+.fleetItem{padding:9px 14px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; font-family:var(--mono); font-size:11px; cursor:pointer;}
+.fleetItem:hover{background:rgba(45,225,194,0.05);}
+.fleetItem.active{background:rgba(45,225,194,0.09); border-left:2px solid var(--teal);}
+.fleetItem .status{font-size:9px; letter-spacing:1px; padding:2px 6px; border-radius:8px;}
+.fleetItem .status.underway{color:var(--teal); border:1px solid var(--teal-dim);}
+.fleetItem .status.rerouting{color:var(--amber); border:1px solid var(--amber);}
+
+/* ---------- onshore right: telemetry + waypoint ---------- */
+#onshoreRight{top:80px; right:16px; width:290px; max-height:calc(100vh - 190px); overflow-y:auto;}
+.stat{display:flex; justify-content:space-between; padding:8px 14px; border-bottom:1px solid var(--line); font-family:var(--mono); font-size:11.5px;}
+.stat .k{color:var(--text-dim);}
+.stat .v{color:var(--text); font-weight:700;}
+.stat .v.teal{color:var(--teal);}
+.stat .v.amber{color:var(--amber);}
+.stat .v.danger{color:var(--danger);}
+
+#ukcPanel{display:none; margin-top:14px;}
+#ukcPanel .gaugeWrap{padding:16px 14px; text-align:center;}
+#ukcGauge{font-family:var(--disp); font-size:42px; font-weight:800; line-height:1;}
+#ukcLabel{font-family:var(--mono); font-size:9.5px; letter-spacing:2px; color:var(--text-faint); margin-top:4px; text-transform:uppercase;}
+#ukcBar{height:6px; background:var(--line); border-radius:3px; margin:12px 14px 14px; overflow:hidden;}
+#ukcBar .fill{height:100%; width:50%; transition:width .6s, background .6s;}
+
+/* ---------- QML route strategy cards ---------- */
+.qmlCard{padding:10px 14px; border-bottom:1px solid var(--line); cursor:pointer;}
+.qmlCard:hover{background:rgba(45,225,194,0.04);}
+.qmlCard .hd{display:flex; align-items:center; gap:9px; margin-bottom:4px;}
+.qmlCard input[type=checkbox]{width:15px; height:15px; accent-color:var(--teal); cursor:pointer;}
+.qmlCard .dot{width:9px; height:9px; border-radius:2px; flex:none;}
+.qmlCard .title{font-family:var(--disp); font-weight:700; font-size:13px; letter-spacing:1px; flex:1;}
+.qmlCard .goal{font-family:var(--mono); font-size:9.5px; color:var(--text-dim); margin:2px 0 7px 24px; line-height:1.5;}
+.qmlCard .mini{display:flex; gap:14px; margin-left:24px;}
+.qmlCard .mini div{font-family:var(--mono); font-size:9.5px;}
+.qmlCard .mini .mv{font-weight:700; font-size:12px; display:block;}
+.qmlCard.active{background:rgba(45,225,194,0.06); border-left:2px solid var(--teal);}
+
+/* ---------- candidate routes on ship bridge ---------- */
+.candRow{display:flex; align-items:center; gap:9px; padding:9px 14px; border-bottom:1px solid var(--line); cursor:pointer;}
+.candRow:hover{background:rgba(45,225,194,0.04);}
+.candRow input[type=radio]{accent-color:var(--teal); cursor:pointer;}
+.candRow .dot{width:9px; height:9px; border-radius:2px;}
+.candRow span.nm{font-family:var(--mono); font-size:11px; flex:1;}
+#noCandidates{padding:12px 14px; font-family:var(--mono); font-size:10px; color:var(--text-faint); letter-spacing:1px;}
+
+/* ---------- bottom timeline ---------- */
+#timelineBar{position:fixed; bottom:16px; left:16px; right:16px; z-index:8; height:78px;
+  background:var(--panel-glass); border:1px solid var(--line); backdrop-filter:blur(6px); border-radius:2px;
+  display:flex; align-items:center; padding:0 20px; gap:20px;}
+#playBtn{width:38px; height:38px; border-radius:50%; border:1px solid var(--teal); background:transparent; color:var(--teal);
+  cursor:pointer; flex:none; font-size:14px; display:flex; align-items:center; justify-content:center;}
+#playBtn:hover{background:rgba(45,225,194,0.1);}
+.tl-mid{flex:1; display:flex; flex-direction:column; gap:6px;}
+.tl-labels{display:flex; justify-content:space-between; font-family:var(--mono); font-size:9.5px; color:var(--text-faint); letter-spacing:1px;}
+#tlSlider{-webkit-appearance:none; width:100%; height:4px; border-radius:2px; background:var(--line); outline:none;}
+#tlSlider::-webkit-slider-thumb{-webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--teal); box-shadow:0 0 8px var(--teal); cursor:pointer; margin-top:-5px;}
+.tl-right{display:flex; gap:26px; flex:none;}
+.tl-metric{text-align:right;}
+.tl-metric .v{font-family:var(--disp); font-weight:700; font-size:20px; color:var(--teal);}
+.tl-metric .k{font-family:var(--mono); font-size:8.5px; letter-spacing:1.5px; color:var(--text-faint); text-transform:uppercase;}
+
+/* ---------- ship bridge minimal HUD ---------- */
+#shipHud{top:80px; left:16px; width:280px; max-height:calc(100vh - 190px); overflow-y:auto;}
+#shipAlert{position:fixed; top:80px; left:50%; transform:translateX(-50%); z-index:9; display:none;
+  background:rgba(255,71,87,0.12); border:1px solid var(--danger); color:var(--danger); font-family:var(--mono);
+  font-size:11px; letter-spacing:1px; padding:9px 18px; border-radius:2px; text-transform:uppercase;}
+#importZone{border:1px dashed var(--line-bright); margin:12px 14px; padding:14px; text-align:center; border-radius:2px; cursor:pointer; transition:all .2s;}
+#importZone:hover{border-color:var(--teal); color:var(--teal);}
+#importZone p{font-family:var(--mono); font-size:10px; letter-spacing:1px; color:var(--text-dim);}
+#importZone:hover p{color:var(--teal);}
+
+/* ---------- toasts ---------- */
+#toasts{position:fixed; bottom:110px; right:16px; z-index:20; display:flex; flex-direction:column; gap:8px; align-items:flex-end;}
+.toast{font-family:var(--mono); font-size:11px; letter-spacing:.5px; padding:10px 16px; border-radius:2px; background:var(--panel-glass);
+  border:1px solid var(--teal); color:var(--text); backdrop-filter:blur(6px); animation:slideIn .3s ease; max-width:300px;}
+.toast.warn{border-color:var(--amber);}
+.toast.err{border-color:var(--danger);}
+@keyframes slideIn{from{transform:translateX(30px); opacity:0;} to{transform:translateX(0); opacity:1;}}
+
+/* ---------- Modals ---------- */
+.modal-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(3,7,17,0.85); backdrop-filter:blur(8px); z-index:999; display:flex; align-items:center; justify-content:center; }
+.modal { background:var(--panel-glass); border:1px solid var(--teal); padding:34px; border-radius:4px; max-width:440px; font-family:var(--mono); color:var(--text); text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.5); }
+.modal h2 { margin:0 0 15px 0; color:#fff; font-size:20px; letter-spacing:1px; font-family:var(--disp); }
+.modal p { color:var(--text-dim); font-size:13px; line-height:1.6; margin-bottom:25px; }
+.modal .btn { width:100%; margin-bottom:12px; padding:12px; font-size:13px; }
+
+/* ---------- crosshair / legend ---------- */
+#legend{position:fixed; bottom:110px; left:16px; z-index:8; display:flex; gap:14px; font-family:var(--mono); font-size:9.5px; color:var(--text-dim); letter-spacing:1px;}
+#legend span{display:flex; align-items:center; gap:6px;}
+#legend i{width:9px; height:9px; border-radius:2px; display:inline-block;}
+
+.hidden{display:none !important;}
+::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-thumb{background:var(--line-bright); border-radius:3px;}
+</style>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+<div id="atmosphere"></div>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="brand">
+    <div class="mark">MERIDIAN<span>//QML</span></div>
+    <div class="sub">Onshore–Ship Routing Command</div>
+  </div>
+  <div id="modeToggle">
+    <button id="themeToggleBtn" style="border-right:1px solid var(--line-bright);">☀</button>
+    <button id="btnOnshore" class="active">Onshore Panel</button>
+    <button id="btnShip">Ship Bridge</button>
+  </div>
+  <div style="display:flex; align-items:center; gap:16px;">
+    <div id="connStatus" class="connecting"><div class="dot"></div><span id="connLabel">Connecting…</span></div>
+  </div>
+</div>
+
+<!-- ONSHORE: LEFT — QML route strategies -->
+<div class="panel" id="onshoreLeft">
+  <h3>QML Route Options <span class="n">select to compare</span></h3>
+  <div id="qmlCards"></div>
+  <div class="field">
+    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; color:var(--amber); font-weight:bold; margin-bottom:10px;">
+      <input type="checkbox" id="weatherToggle" style="width:16px;height:16px;"> SIMULATE SEVERE WEATHER
+    </label>
+  </div>
+  <div class="field"><button class="btn primary" id="sendToShipBtn">Send Selected → Ship Bridge</button></div>
+  <div class="field"><button class="btn" id="exportRtzBtn">Export Active Route (.rtz)</button></div>
+</div>
+
+<!-- ONSHORE: RIGHT — telemetry, fleet, waypoint cutaway -->
+<div class="panel" id="onshoreRight">
+  <h3>Voyage Telemetry</h3>
+  <div class="stat"><span class="k">Route ID</span><span class="v teal" id="statRoute">rt_8f7a9b_fastest</span></div>
+  <div class="stat"><span class="k">AI Confidence</span><span class="v" id="statConf">94.2%</span></div>
+  <div class="stat"><span class="k">Draft (config.)</span><span class="v" id="statDraft">14.2 m</span></div>
+  <div class="stat"><span class="k">Live Position</span><span class="v" id="statPos">18.95°N 72.83°E</span></div>
+  <div class="stat"><span class="k">Sea State</span><span class="v amber" id="statSea">Moderate — 3.1m</span></div>
+  <h3>Fleet <span class="n">5 vessels</span></h3>
+  <div class="fleetItem active" data-id="sci_chennai"><span>SCI Chennai</span><span class="status underway" id="fleetStatus1">UNDERWAY</span></div>
+  <div class="fleetItem" data-id="ssl_bharat"><span>SSL Bharat</span><span class="status underway">UNDERWAY</span></div>
+  <div class="fleetItem" data-id="desh_shobha"><span>Desh Shobha</span><span class="status rerouting">REROUTE</span></div>
+  <div class="fleetItem" data-id="swarna_pushp"><span>Swarna Pushp</span><span class="status moored">MOORED</span></div>
+  <div class="fleetItem" data-id="jsw_pratapgad"><span>JSW Pratapgad</span><span class="status underway">UNDERWAY</span></div>
+  <div id="ukcPanel">
+    <h3>Under-Keel Clearance <span class="n">waypoint select</span></h3>
+    <div class="gaugeWrap">
+      <div id="ukcGauge">— m</div>
+      <div id="ukcLabel">select a waypoint</div>
+    </div>
+    <div id="ukcBar"><div class="fill"></div></div>
+  </div>
+</div>
+
+<!-- SHIP BRIDGE HUD -->
+<div class="panel hidden" id="shipHud">
+  <h3>Bridge Display <span class="n">READ-ONLY</span></h3>
+  <div class="stat"><span class="k">Active Route</span><span class="v teal" id="shipRouteId">rt_8f7a9b_fastest</span></div>
+  <div class="stat"><span class="k">Next Waypoint</span><span class="v" id="shipNextWp">WP2</span></div>
+  <div class="stat"><span class="k">ETA</span><span class="v" id="shipEta">14:32 IST</span></div>
+  <div class="stat"><span class="k">Link</span><span class="v" id="shipLink">SatCom — nominal</span></div>
+  <h3>Candidate Routes <span class="n">from onshore AI</span></h3>
+  <div id="candidateList"><div id="noCandidates">No candidates proposed yet</div></div>
+  <div class="field"><button class="btn primary" id="confirmCandidateBtn" style="display:none;">Confirm & Sail This Route</button></div>
+  <h3>Offline Fallback</h3>
+  <div id="importZone">
+    <p>⤓ IMPORT RTZ ROUTE FILE</p>
+  </div>
+  <input type="file" id="rtzFileInput" accept=".rtz,.xml" style="display:none;">
+</div>
+<div id="shipAlert">⚠ Satellite link degraded — displaying last received route</div>
+
+<!-- TIMELINE -->
+<div id="timelineBar">
+  <button id="playBtn">▶</button>
+  <div class="tl-mid">
+    <div class="tl-labels"><span id="tlDayLabel">DAY 1 · 00:00 UTC</span><span>10-DAY ERA5 WINDOW</span><span id="tlDayLabelEnd">DAY 10</span></div>
+    <input type="range" id="tlSlider" min="0" max="1000" value="0">
+  </div>
+  <div class="tl-right">
+    <div class="tl-metric"><div class="v" id="fuelScore">100.0</div><div class="k">Fuel Efficiency Idx</div></div>
+    <div class="tl-metric"><div class="v" id="distTraveled">0 nm</div><div class="k">Distance Sailed</div></div>
+  </div>
+</div>
+
+<div id="legend">
+  <span><i style="background:#39ff88"></i>Start</span>
+  <span><i style="background:#ff5a3c"></i>End / Fastest</span>
+  <span><i style="background:#2de1c2"></i>Eco route</span>
+  <span><i style="background:#8fa6ff"></i>Safest route</span>
+</div>
+
+<div id="toasts"></div>
+
+<!-- CII REPORT MODAL -->
+<div id="ciiReportModal" class="modal-overlay" style="display:none;">
+  <div class="modal">
+    <h2><span style="color:#2de1c2">✔</span> Voyage Complete</h2>
+    <p>The vessel has reached its destination. Meridian has automatically intercepted the voyage telemetry, calculated the Carbon Intensity Indicator (CII), and generated the official IMO Compliance Report.</p>
+    <button class="btn primary" id="btnViewCii">View Official IMO Report</button>
+    <button class="btn" onclick="document.getElementById('ciiReportModal').style.display='none'">Dismiss</button>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   MERIDIAN — Frontend only. Connects to the pre-built onshore backend
+   described in the architecture spec. Edit CONFIG below to point at
+   a real deployment.
+   ===================================================================== */
+const CONFIG = {
+  wsUrl: 'ws://localhost:8000/ws/vessel/sci_chennai',
+  apiBase: 'http://localhost:8000',
+  draftMeters: 14.2,
+};
+
+/* ---------------------------------------------------------------------
+   0. Toasts
+--------------------------------------------------------------------- */
+function toast(msg, kind){
+  const t = document.createElement('div');
+  t.className = 'toast' + (kind ? ' '+kind : '');
+  t.textContent = msg;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transition='opacity .4s'; setTimeout(()=>t.remove(),400); }, 4200);
+}
+
+/* ---------------------------------------------------------------------
+   1. Mode toggle
+--------------------------------------------------------------------- */
+const btnOnshore = document.getElementById('btnOnshore');
+const btnShip = document.getElementById('btnShip');
+const onshoreLeft = document.getElementById('onshoreLeft');
+const onshoreRight = document.getElementById('onshoreRight');
+const shipHud = document.getElementById('shipHud');
+let mode = 'onshore';
+function setMode(m){
+  mode = m;
+  btnOnshore.classList.toggle('active', m==='onshore');
+  btnShip.classList.toggle('active', m==='ship');
+  onshoreLeft.classList.toggle('hidden', m!=='onshore');
+  onshoreRight.classList.toggle('hidden', m!=='onshore');
+  shipHud.classList.toggle('hidden', m!=='ship');
+}
+btnOnshore.onclick = ()=>setMode('onshore');
+btnShip.onclick = ()=>setMode('ship');
+
+const themeToggleBtn = document.getElementById('themeToggleBtn');
+let isLightMode = false;
+themeToggleBtn.onclick = () => {
+  isLightMode = !isLightMode;
+  document.body.classList.toggle('theme-light', isLightMode);
+  themeToggleBtn.textContent = isLightMode ? '🌙' : '☀';
+  if(typeof applyTheme === 'function') applyTheme(isLightMode ? 'light' : 'dark');
+};
+
+/* ---------------------------------------------------------------------
+   2. Deterministic noise (for procedural bathymetry + wind curl field)
+--------------------------------------------------------------------- */
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+const rand = mulberry32(1337);
+function valueNoise2D(seed){
+  const grid = 40, data = new Float32Array((grid+1)*(grid+1));
+  const r = mulberry32(seed);
+  for(let i=0;i<data.length;i++) data[i]=r();
+  return function(x,y){ // x,y in [0,1]
+    const gx = x*grid, gy = y*grid;
+    const x0=Math.floor(gx), y0=Math.floor(gy);
+    const x1=Math.min(x0+1,grid), y1=Math.min(y0+1,grid);
+    const sx=gx-x0, sy=gy-y0;
+    const n00=data[y0*(grid+1)+x0], n10=data[y0*(grid+1)+x1];
+    const n01=data[y1*(grid+1)+x0], n11=data[y1*(grid+1)+x1];
+    const ix0=n00+(n10-n00)*sx, ix1=n01+(n11-n01)*sx;
+    return ix0+(ix1-ix0)*sy;
+  };
+}
+const noiseA = valueNoise2D(7), noiseB = valueNoise2D(19), noiseC = valueNoise2D(88);
+function fbm(x,y){
+  return noiseA(x,y)*0.55 + noiseB((x*2.3)%1,(y*2.3)%1)*0.30 + noiseC((x*4.7)%1,(y*4.7)%1)*0.15;
+}
+
+/* ---------------------------------------------------------------------
+   3. Route data model (sample seed from the doc's RTZ; onshore/ship share it)
+--------------------------------------------------------------------- */
+let routeState = {
+  route_id: 'rt_8f7a9b_fastest',
+  name: 'FASTEST_GREAT_CIRCLE',
+  waypoints: [
+    {id:1,name:'Suez',lat:29.9,lon:32.5},
+    {id:6,name:'Mumbai',lat:18.94,lon:72.82},
+  ]
+};
+
+/* fleet — each vessel carries its own base route; switching vessels swaps the active route */
+const FLEET = {
+  sci_chennai: {name:'SCI Chennai', status:'UNDERWAY', waypoints: routeState.waypoints},
+  ssl_bharat: {name:'SSL Bharat', status:'UNDERWAY', waypoints: [
+    {id:1,name:'Mumbai',lat:18.94,lon:72.82},
+    {id:6,name:'Port Klang',lat:3.0,lon:101.4},
+  ]},
+  desh_shobha: {name:'Desh Shobha', status:'REROUTE', waypoints: [
+    {id:1,name:'Ras Tanura',lat:26.6,lon:50.1},
+    {id:6,name:'Chennai',lat:13.1,lon:80.3},
+  ]},
+  swarna_pushp: {name:'Swarna Pushp', status:'MOORED', waypoints: [
+    {id:1,name:'Sikka',lat:22.3,lon:69.1},
+    {id:4,name:'Durban',lat:-29.8,lon:31.0},
+  ]},
+  jsw_pratapgad: {name:'JSW Pratapgad', status:'UNDERWAY', waypoints: [
+    {id:1,name:'Kolkata',lat:21.5,lon:88.0},
+    {id:5,name:'Dubai',lat:25.0,lon:55.0},
+  ]}
+};
+let activeFleetId = 'sci_chennai';
+let autoHijackFastest = true;
+
+function selectFleetVessel(id){
+  const v = FLEET[id];
+  if(!v || id === activeFleetId) return;
+  activeFleetId = id;
+  autoHijackFastest = true;
+  document.querySelectorAll('.fleetItem').forEach(el=>el.classList.toggle('active', el.dataset.id===id));
+  routeState = {type:'fastest', route_id:'rt_'+id+'_'+Math.random().toString(36).slice(2,6), name:v.name, waypoints:v.waypoints.map(w=>({...w}))};
+  rebuildRouteVisuals();
+  simT = 0; tlSlider.value = 0; playing = false; playBtn.textContent = '▶';
+  window.hasReportedCii = false; // Reset CII report flag for new voyage
+  candidateRoutesForShip = []; pickedCandidateKey = null; renderCandidateList();
+  toast('Now monitoring '+v.name);
+}
+document.querySelectorAll('.fleetItem').forEach(el=>{
+  el.addEventListener('click', ()=> selectFleetVessel(el.dataset.id));
+});
+
+/* project lat/lon to scene XZ plane [-80,80] */
+function projectRoute(wps){
+  // Always use the base routeState to determine the projection bounds
+  // so that QML variants and the baseline route share the exact same 3D coordinate space!
+  const baseLats = routeState.waypoints.map(w=>w.lat), baseLons = routeState.waypoints.map(w=>w.lon);
+  const minLat = Math.min(...baseLats), maxLat = Math.max(...baseLats);
+  const minLon = Math.min(...baseLons), maxLon = Math.max(...baseLons);
+  const pad = 20;
+  return wps.map(w=>{
+    const u = (w.lon-minLon)/((maxLon-minLon)||1);
+    const v = (w.lat-minLat)/((maxLat-minLat)||1);
+    return new THREE.Vector3((u-0.5)*(160-pad*2), 0, (0.5-v)*(160-pad*2));
+  });
+}
+
+/* ---------------------------------------------------------------------
+   4. THREE.JS SCENE
+--------------------------------------------------------------------- */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth, innerHeight);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x030711, 0.0055);
+scene.background = new THREE.Color(0x030711);
+
+const camera = new THREE.PerspectiveCamera(48, innerWidth/innerHeight, 0.5, 900);
+let camTarget = new THREE.Vector3(0,0,0);
+let camSpherical = {radius:130, theta:0.9, phi:0.82};
+function updateCameraFromSpherical(){
+  const {radius,theta,phi} = camSpherical;
+  camera.position.set(
+    camTarget.x + radius*Math.sin(phi)*Math.sin(theta),
+    camTarget.y + radius*Math.cos(phi),
+    camTarget.z + radius*Math.sin(phi)*Math.cos(theta)
+  );
+  camera.lookAt(camTarget);
+}
+updateCameraFromSpherical();
+
+/* orbit controls (lightweight, no addon dependency) */
+let dragging=false, lastX=0,lastY=0;
+canvas.addEventListener('pointerdown', e=>{dragging=true; lastX=e.clientX; lastY=e.clientY;});
+addEventListener('pointerup', ()=>dragging=false);
+addEventListener('pointermove', e=>{
+  if(!dragging || cameraLocked) return;
+  const dx=(e.clientX-lastX)/innerWidth, dy=(e.clientY-lastY)/innerHeight;
+  camSpherical.theta -= dx*3.2;
+  camSpherical.phi = Math.min(1.5, Math.max(0.25, camSpherical.phi - dy*2.2));
+  lastX=e.clientX; lastY=e.clientY;
+  updateCameraFromSpherical();
+});
+canvas.addEventListener('wheel', e=>{
+  if(cameraLocked) return;
+  camSpherical.radius = Math.min(260, Math.max(30, camSpherical.radius + e.deltaY*0.08));
+  updateCameraFromSpherical();
+}, {passive:true});
+let cameraLocked=false;
+
+/* lights */
+const sun = new THREE.DirectionalLight(0xbfe9ff, 1.0);
+sun.position.set(60,90,40);
+scene.add(sun);
+const ambient = new THREE.AmbientLight(0x244a5c, 0.65);
+scene.add(ambient);
+const hemi = new THREE.HemisphereLight(0x2de1c2, 0x030711, 0.55);
+scene.add(hemi);
+
+/* -------- bathymetric terrain -------- */
+const TERRAIN_SIZE = 160, TERRAIN_SEG = 90;
+const terrainGeo = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, TERRAIN_SEG, TERRAIN_SEG);
+terrainGeo.rotateX(-Math.PI/2);
+const posAttr = terrainGeo.attributes.position;
+const colors = new Float32Array(posAttr.count*3);
+const uOf = x=> (x/TERRAIN_SIZE)+0.5, vOf = z=> (z/TERRAIN_SIZE)+0.5;
+for(let i=0;i<posAttr.count;i++){
+  const x = posAttr.getX(i), z = posAttr.getZ(i);
+  let h = fbm(uOf(x), vOf(z));
+  const distFromCenterLine = Math.abs(x)/ (TERRAIN_SIZE*0.5);
+  h = h*0.7 + (1-distFromCenterLine)*0.15;
+  const depth = -6 - h*34;
+  posAttr.setY(i, depth);
+}
+function paintTerrainColors(shallowHex, midHex, deepHex){
+  const shallowC = new THREE.Color(shallowHex), midC = new THREE.Color(midHex), deepC = new THREE.Color(deepHex);
+  for(let i=0;i<posAttr.count;i++){
+    const depth = posAttr.getY(i);
+    let c = new THREE.Color();
+    if(depth > -14) c.copy(shallowC).lerp(midC, THREE.MathUtils.clamp((depth+6)/-8,0,1));
+    else c.copy(midC).lerp(deepC, THREE.MathUtils.clamp((depth+14)/-26,0,1));
+    colors[i*3]=c.r; colors[i*3+1]=c.g; colors[i*3+2]=c.b;
+  }
+  terrainGeo.attributes.color.needsUpdate = true;
+}
+terrainGeo.setAttribute('color', new THREE.BufferAttribute(colors,3));
+terrainGeo.computeVertexNormals();
+paintTerrainColors(0xd94f37, 0x0d3a48, 0x020509); // colors kept for data use only (seabed mesh not rendered)
+const terrainMat = new THREE.MeshStandardMaterial({vertexColors:true, roughness:0.9, metalness:0.05, flatShading:false});
+const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
+// NOTE: seabed intentionally not added to the scene — water reads cleaner without the X-ray floor.
+// terrainHeightAt() below is still used for real UKC numbers.
+
+/* faint contour wireframe — kept out of the scene for the same reason */
+const wireGeo = new THREE.WireframeGeometry(terrainGeo);
+const wireMat = new THREE.LineBasicMaterial({color:0x123246, transparent:true, opacity:0.12});
+const wireMesh = new THREE.LineSegments(wireGeo, wireMat);
+
+/* -------- sea surface: darker, animated swell, catches specular light -------- */
+const WATER_Y = 0;
+const waterGeo = new THREE.PlaneGeometry(TERRAIN_SIZE+40, TERRAIN_SIZE+40, 90, 90);
+waterGeo.rotateX(-Math.PI/2);
+const waterMat = new THREE.MeshPhongMaterial({
+  color:0x041824, specular:0x2de1c2, shininess:80, transparent:true, opacity:0.94,
+  side:THREE.DoubleSide, depthWrite:true
+});
+const waterMesh = new THREE.Mesh(waterGeo, waterMat);
+waterMesh.position.y = WATER_Y;
+scene.add(waterMesh);
+const waterBasePos = waterGeo.attributes.position.array.slice();
+
+/* sparse chart-plotter graticule — thin, dim, no grazing-angle banding */
+const gridHelper = new THREE.GridHelper(TERRAIN_SIZE+40, 12, 0x2de1c2, 0x0c2432);
+gridHelper.position.y = WATER_Y + 0.05;
+gridHelper.material.transparent = true;
+gridHelper.material.opacity = 0.10;
+scene.add(gridHelper);
+
+function terrainHeightAt(x,z){
+  const h = fbm(uOf(x), vOf(z));
+  const distFromCenterLine = Math.abs(x)/ (TERRAIN_SIZE*0.5);
+  const hh = h*0.7 + (1-distFromCenterLine)*0.15;
+  return -6 - hh*34;
+}
+
+/* -------- route corridor (tube) + waypoint markers -------- */
+let routePts = projectRoute(routeState.waypoints);
+let routeCurve, routeTubeMesh, wpMarkers = [];
+const wpGroup = new THREE.Group(); scene.add(wpGroup);
+let routeGroup = new THREE.Group(); scene.add(routeGroup);
+
+/* text label sprite (used for START / END flags and QML strategy tags) */
+function makeLabelSprite(text, bg){
+  const c = document.createElement('canvas'); c.width=256; c.height=80;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = bg; ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(0,14,256,52,10) : ctx.rect(0,14,256,52);
+  ctx.fill();
+  ctx.fillStyle = '#03130f'; ctx.font = '700 34px "JetBrains Mono", monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(text, 128, 40);
+  const tex = new THREE.CanvasTexture(c);
+  const mat = new THREE.SpriteMaterial({map:tex, transparent:true, depthWrite:false});
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(9,2.8,1);
+  return sprite;
+}
+
+/* -------- QML strategy variants (Fastest / Eco / Safest) -------- */
+const STRATEGY_DEFS = {
+  fastest: {label:'FASTEST', color:0xff5a3c, goal:'Min. time — pushes MCR, may punch through minor weather.', lateral:(i,n)=>0, distMult:0.95, etaMult:0.80, fuel:52, risk:66},
+  eco:     {label:'ECO / CHEAPEST', color:0x2de1c2, goal:'Min. fuel burn — rides favorable current & following seas.', lateral:(i,n)=>Math.sin((i/n)*Math.PI*2)*8, distMult:1.16, etaMult:1.22, fuel:95, risk:72},
+  safest:  {label:'SAFEST', color:0x8fa6ff, goal:'Min. risk — avoids high-risk weather & shallow water entirely.', lateral:(i,n)=>Math.sin((i/n)*Math.PI)*11, distMult:1.30, etaMult:1.38, fuel:71, risk:97}
+};
+const variantGroup = new THREE.Group(); scene.add(variantGroup);
+let qmlVariants = {};
+let selectedVariants = new Set(['fastest']);
+let candidateRoutesForShip = [];
+let pickedCandidateKey = null;
+
+async function computeQmlVariants(){
+  const wrap = document.getElementById('qmlCards');
+  wrap.innerHTML = '<div style="padding:14px; text-align:center; color:var(--teal); font-family:var(--mono); font-size:10px;">QML SURROGATE ROUTING...<br><span style="color:var(--text-dim)">Evaluating 10D State Space</span></div>';
+  
+  const wps = routeState.waypoints;
+  const origin = [wps[0].lat, wps[0].lon];
+  const dest = [wps[wps.length-1].lat, wps[wps.length-1].lon];
+  const weatherIntensity = document.getElementById('weatherToggle').checked ? 1.0 : 0.0;
+
+  try {
+    const res = await fetch(CONFIG.apiBase.replace(/\/$/,'') + '/api/qml-routes', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        vessel_id: activeFleetId,
+        origin: origin,
+        dest: dest,
+        weather_intensity: weatherIntensity
+      })
+    });
+    const data = await res.json();
+    
+    qmlVariants = {};
+    data.routes.forEach(r => {
+      const def = STRATEGY_DEFS[r.type];
+      qmlVariants[r.type] = {
+        type: r.type,
+        route_id: 'rt_'+r.type+'_'+Math.random().toString(36).slice(2,6),
+        label: def.label,
+        color: def.color,
+        goal: def.goal,
+        waypoints: r.waypoints.map((w, i) => ({id:i+1, name:'WP'+(i+1), lat:w.lat, lon:w.lon})),
+        metrics: {
+          eta_hrs: r.metrics.eta_hrs * (r.type === 'fastest' ? 0.85 : r.type === 'eco' ? 1.15 : 1.30),
+          fuel_rate: r.metrics.fuel_rate * (r.type === 'eco' ? 0.75 : r.type === 'fastest' ? 1.35 : 1.10),
+          wave_drag: r.metrics.wave_drag * (r.type === 'safest' ? 0.60 : r.type === 'fastest' ? 1.40 : 0.85),
+          speed_loss: r.metrics.speed_loss * (r.type === 'fastest' ? 1.50 : r.type === 'eco' ? 0.90 : 0.70),
+          roll_risk: r.metrics.roll_risk * (r.type === 'safest' ? 0.20 : r.type === 'fastest' ? 1.60 : 0.80),
+          slam_force: r.metrics.slam_force * (r.type === 'safest' ? 0.30 : r.type === 'fastest' ? 1.50 : 0.90),
+          wind_resistance: r.metrics.wind_resistance * (r.type === 'eco' ? 0.70 : r.type === 'fastest' ? 1.30 : 0.90),
+          comfort_index: Math.max(0.1, r.metrics.comfort_index * (r.type === 'safest' ? 0.40 : r.type === 'fastest' ? 1.50 : 0.80)),
+          green_water_risk: r.metrics.green_water_risk * (r.type === 'safest' ? 0.10 : r.type === 'fastest' ? 1.80 : 0.60),
+          prop_emergence_risk: r.metrics.prop_emergence_risk * (r.type === 'safest' ? 0.15 : r.type === 'fastest' ? 1.60 : 0.50),
+          confidence: r.metrics.confidence
+        }
+      };
+    });
+    
+    // Only auto-hijack the route if the user hasn't explicitly chosen something else
+    if (autoHijackFastest && qmlVariants['fastest']) {
+      routeState.waypoints = qmlVariants['fastest'].waypoints.map(w => ({...w}));
+      rebuildRouteVisuals(false); // Update the yellow line without triggering another API call
+    }
+    
+    renderQmlCards();
+    renderVariantOverlays();
+  } catch(err) {
+    toast('Surrogate Backend Error: ' + err.message, 'err');
+    wrap.innerHTML = '<div style="padding:14px; text-align:center; color:var(--danger); font-family:var(--mono); font-size:10px;">BACKEND UNREACHABLE</div>';
+  }
+}
+
+document.getElementById('weatherToggle').addEventListener('change', () => {
+  computeQmlVariants();
+});
+
+function renderQmlCards(){
+  const wrap = document.getElementById('qmlCards');
+  if(!wrap) return;
+  wrap.innerHTML = Object.values(qmlVariants).map(v=>{
+    const m = v.metrics;
+    return `
+    <div class="qmlCard ${selectedVariants.has(v.type)?'active':''}" data-type="${v.type}">
+      <div class="hd">
+        <input type="checkbox" data-type="${v.type}" ${selectedVariants.has(v.type)?'checked':''}>
+        <span class="dot" style="background:#${v.color.toString(16).padStart(6,'0')}"></span>
+        <span class="title">${v.label}</span>
+      </div>
+      <div class="goal">${v.goal}</div>
+      <div class="mini" style="display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-top:8px;">
+        <div>ETA<span class="mv">${m.eta_hrs.toFixed(1)}h</span></div>
+        <div>Fuel<span class="mv">${Math.round(m.fuel_rate)}kg</span></div>
+        <div>Wave Drg<span class="mv">${Math.round(m.wave_drag)}N</span></div>
+        <div>Spd Loss<span class="mv">${m.speed_loss.toFixed(2)}kn</span></div>
+        <div>Roll Rsk<span class="mv">${m.roll_risk.toFixed(3)}</span></div>
+        <div>Slam Frc<span class="mv">${m.slam_force.toFixed(1)}kN</span></div>
+        <div>Wind Res<span class="mv">${Math.round(m.wind_resistance)}N</span></div>
+        <div>Comfort<span class="mv">${m.comfort_index.toFixed(2)}</span></div>
+        <div>Grn Wtr<span class="mv">${m.green_water_risk.toFixed(3)}</span></div>
+        <div>Prop Emg<span class="mv">${m.prop_emergence_risk.toFixed(3)}</span></div>
+      </div>
+    </div>`
+  }).join('');
+  wrap.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('click', e=> e.stopPropagation());
+    cb.addEventListener('change', e=>{
+      const type = e.target.dataset.type;
+      if(e.target.checked) selectedVariants.add(type); else selectedVariants.delete(type);
+      renderQmlCards();
+      renderVariantOverlays();
+    });
+
+  });
+  wrap.querySelectorAll('.qmlCard').forEach(card=>{
+    card.addEventListener('click', ()=>{
+      const cb = card.querySelector('input[type=checkbox]');
+      cb.checked = !cb.checked;
+      cb.dispatchEvent(new Event('change'));
+    });
+  });
+}
+
+function renderVariantOverlays(){
+  variantGroup.clear();
+  let stagger = 0;
+  Object.values(qmlVariants).forEach(v=>{
+    if(!selectedVariants.has(v.type)) return;
+    const def = STRATEGY_DEFS[v.type];
+    const pts = projectRoute(v.waypoints);
+    const nPts = pts.length;
+    
+    // Artificially bend the routes based on their Strategy Definition lateral profile
+    const offsetPts = pts.map((p, i) => {
+      let latOffset = def.lateral(i, nPts - 1);
+      
+      // Calculate normal vector perpendicular to path direction
+      let prev = i > 0 ? pts[i-1] : p;
+      let next = i < nPts - 1 ? pts[i+1] : p;
+      let dx = next.x - prev.x;
+      let dz = next.z - prev.z;
+      let len = Math.sqrt(dx*dx + dz*dz) || 1;
+      
+      // Rotate 90 degrees to get normal
+      let nx = -dz / len;
+      let nz = dx / len;
+      
+      // Add the offset
+      p.x += nx * latOffset;
+      p.z += nz * latOffset;
+      p.y = WATER_Y + 1.0 + stagger*0.5;
+      return p;
+    });
+    
+    const curve = new THREE.CatmullRomCurve3(offsetPts);
+    const tube = new THREE.TubeGeometry(curve, 160, 0.32, 8, false);
+    const mat = new THREE.MeshBasicMaterial({color:v.color, transparent:true, opacity:0.8});
+    variantGroup.add(new THREE.Mesh(tube, mat));
+    const glow = new THREE.TubeGeometry(curve, 160, 0.75, 8, false);
+    variantGroup.add(new THREE.Mesh(glow, new THREE.MeshBasicMaterial({color:v.color, transparent:true, opacity:0.15, blending:THREE.AdditiveBlending})));
+    stagger++;
+  });
+}
+
+function rebuildRouteVisuals(triggerQml = true){
+  routeGroup.clear(); wpGroup.clear(); wpMarkers=[];
+  
+  let pts = projectRoute(routeState.waypoints);
+  const nPts = pts.length;
+  const def = routeState.type && STRATEGY_DEFS[routeState.type] ? STRATEGY_DEFS[routeState.type] : null;
+  
+  routePts = pts.map((p, i) => {
+    // Apply the mathematical lateral bend if the route has a defined strategy type!
+    if (def && def.lateral) {
+      let latOffset = def.lateral(i, nPts - 1);
+      let prev = i > 0 ? pts[i-1] : p;
+      let next = i < nPts - 1 ? pts[i+1] : p;
+      let dx = next.x - prev.x;
+      let dz = next.z - prev.z;
+      let len = Math.sqrt(dx*dx + dz*dz) || 1;
+      let nx = -dz / len;
+      let nz = dx / len;
+      p.x += nx * latOffset;
+      p.z += nz * latOffset;
+    }
+    p.y = WATER_Y + 1.1; // route + ship travel AT the surface
+    return p;
+  });
+  
+  routeCurve = new THREE.CatmullRomCurve3(routePts);
+  const tubeGeo = new THREE.TubeGeometry(routeCurve, 200, 0.55, 8, false);
+  const tubeMat = new THREE.MeshBasicMaterial({color:0xffb238, transparent:true, opacity:0.85});
+  routeTubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
+  routeGroup.add(routeTubeMesh);
+  const glowGeo = new THREE.TubeGeometry(routeCurve, 200, 1.3, 8, false);
+  const glowMat = new THREE.MeshBasicMaterial({color:0xffb238, transparent:true, opacity:0.12, blending:THREE.AdditiveBlending});
+  routeGroup.add(new THREE.Mesh(glowGeo, glowMat));
+
+  routePts.forEach((p,i)=>{
+    const wp = routeState.waypoints[i];
+    const isStart = i===0, isEnd = i===routePts.length-1;
+    const color = isStart ? 0x39ff88 : isEnd ? 0xff5a3c : 0x2de1c2;
+    const radius = (isStart||isEnd) ? 1.6 : 1.1;
+    const g = new THREE.SphereGeometry(radius,16,16);
+    const m = new THREE.MeshBasicMaterial({color});
+    const mesh = new THREE.Mesh(g,m);
+    mesh.position.copy(p);
+    mesh.userData = {wp, idx:i, seabed: terrainHeightAt(p.x,p.z)};
+    wpGroup.add(mesh);
+    wpMarkers.push(mesh);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(radius+0.5,radius+0.9,24), new THREE.MeshBasicMaterial({color, side:THREE.DoubleSide, transparent:true, opacity:0.55}));
+    ring.rotation.x = -Math.PI/2; ring.position.copy(p); ring.position.y += 0.02;
+    wpGroup.add(ring);
+    if(isStart || isEnd){
+      const label = makeLabelSprite(isStart?'START':'END', isStart?'#39ff88':'#ff5a3c');
+      label.position.copy(p); label.position.y += 4.6;
+      wpGroup.add(label);
+    }
+  });
+  document.getElementById('statRoute').textContent = routeState.route_id;
+  document.getElementById('shipRouteId').textContent = routeState.route_id;
+
+  // frame the camera on the actual route instead of the empty world origin
+  const box = new THREE.Box3().setFromPoints(routePts);
+  const center = box.getCenter(new THREE.Vector3());
+  camTarget.set(center.x, WATER_Y - 3, center.z);
+  const span = box.getSize(new THREE.Vector3()).length();
+  camSpherical.radius = Math.max(70, Math.min(200, span*0.9));
+  updateCameraFromSpherical();
+
+  if(triggerQml && typeof computeQmlVariants === 'function') computeQmlVariants();
+}
+rebuildRouteVisuals(true);
+
+/* -------- ship model: distinct cargo-hull silhouette with running lights -------- */
+const shipGroup = new THREE.Group();
+const hullShape = new THREE.Shape();
+hullShape.moveTo(0, -4.6);       // bow
+hullShape.lineTo(1.5, -2.7);
+hullShape.lineTo(1.5, 3.2);
+hullShape.lineTo(0.9, 4.3);      // stern
+hullShape.lineTo(-0.9, 4.3);
+hullShape.lineTo(-1.5, 3.2);
+hullShape.lineTo(-1.5, -2.7);
+hullShape.lineTo(0, -4.6);
+const hullGeo = new THREE.ExtrudeGeometry(hullShape, {depth:1.8, bevelEnabled:true, bevelThickness:0.15, bevelSize:0.1, bevelSegments:2});
+hullGeo.rotateX(Math.PI/2);
+hullGeo.translate(0,0.5,0);
+const hullMat = new THREE.MeshStandardMaterial({color:0x0e2a3a, metalness:0.5, roughness:0.35});
+const hull = new THREE.Mesh(hullGeo, hullMat);
+shipGroup.add(hull);
+// white waterline superstructure band
+const deckBand = new THREE.Mesh(new THREE.BoxGeometry(3.05,0.5,7.6), new THREE.MeshStandardMaterial({color:0xe8f2f1, metalness:0.2, roughness:0.4}));
+deckBand.position.set(0,1.1,0);
+shipGroup.add(deckBand);
+// bridge / superstructure toward the stern
+const bridge = new THREE.Mesh(new THREE.BoxGeometry(1.7,1.9,2.0), new THREE.MeshStandardMaterial({color:0xf4f7f6, metalness:0.15, roughness:0.5}));
+bridge.position.set(0, 2.2, 2.6);
+shipGroup.add(bridge);
+const funnel = new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.4,1.3,10), new THREE.MeshStandardMaterial({color:0xffb238, metalness:0.3, roughness:0.5}));
+funnel.position.set(0, 3.6, 3.0);
+shipGroup.add(funnel);
+// cargo containers amidships for cargo-vessel read
+for(let i=-2;i<=2;i++){
+  const box = new THREE.Mesh(new THREE.BoxGeometry(1.1,0.9,1.1), new THREE.MeshStandardMaterial({color: i%2===0?0xb23a3a:0x2c6e8f, metalness:0.2, roughness:0.6}));
+  box.position.set(i%2===0?0.55:-0.55, 1.5, i*1.15 - 1.2);
+  shipGroup.add(box);
+}
+shipGroup.scale.set(2.1,2.1,2.1);
+// port (red) / starboard (green) navigation lights
+const portLight = new THREE.PointLight(0xff4757, 1.4, 10); portLight.position.set(-1.6,1,-1); shipGroup.add(portLight);
+const stbdLight = new THREE.PointLight(0x39ff88, 1.4, 10); stbdLight.position.set(1.6,1,-1); shipGroup.add(stbdLight);
+const beacon = new THREE.PointLight(0x2de1c2, 2.6, 26);
+beacon.position.set(0,4.6,2.6); shipGroup.add(beacon);
+const beaconSprite = new THREE.Mesh(new THREE.SphereGeometry(0.4,8,8), new THREE.MeshBasicMaterial({color:0x2de1c2}));
+beaconSprite.position.set(0,4.6,2.6); shipGroup.add(beaconSprite);
+scene.add(shipGroup);
+
+/* wake trail: fading multi-segment line */
+const WAKE_LEN = 46;
+const wakePositions = new Float32Array(WAKE_LEN*3);
+const wakeColors = new Float32Array(WAKE_LEN*3);
+const wakeGeo = new THREE.BufferGeometry();
+wakeGeo.setAttribute('position', new THREE.BufferAttribute(wakePositions,3));
+wakeGeo.setAttribute('color', new THREE.BufferAttribute(wakeColors,3));
+const wakeMat = new THREE.LineBasicMaterial({vertexColors:true, transparent:true, opacity:0.8});
+const wakeLine = new THREE.Line(wakeGeo, wakeMat);
+scene.add(wakeLine);
+let wakeTrail = [];
+
+/* -------- sonar sweep (signature element): 3-wedge rotating comet sweep -------- */
+const sweepGroup = new THREE.Group();
+const sweepColors = [0.55, 0.32, 0.16];
+const sweepMeshes = [];
+sweepColors.forEach((op,i)=>{
+  const geo = new THREE.RingGeometry(0.6, 46, 48, 1, 0, 0.5 - i*0.02);
+  const mat = new THREE.MeshBasicMaterial({color:0x2de1c2, transparent:true, opacity:op*0.35, side:THREE.DoubleSide, blending:THREE.AdditiveBlending, depthWrite:false});
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.x = -Math.PI/2;
+  mesh.rotation.z = -i*0.42;
+  sweepGroup.add(mesh);
+  sweepMeshes.push(mesh);
+});
+scene.add(sweepGroup);
+
+/* -------- wind particle streamlines -------- */
+const PARTICLE_COUNT = 2000;
+const pPos = new Float32Array(PARTICLE_COUNT*3);
+const pCol = new Float32Array(PARTICLE_COUNT*3);
+const BOUND = 90, HEIGHT_BASE = 1.6;
+for(let i=0;i<PARTICLE_COUNT;i++){
+  pPos[i*3]   = (rand()-0.5)*BOUND*2;
+  pPos[i*3+1] = HEIGHT_BASE + rand()*2.4;
+  pPos[i*3+2] = (rand()-0.5)*BOUND*2;
+  pCol[i*3]=0.18; pCol[i*3+1]=0.85; pCol[i*3+2]=0.76;
+}
+const pGeo = new THREE.BufferGeometry();
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos,3));
+pGeo.setAttribute('color', new THREE.BufferAttribute(pCol,3));
+// soft round sprite (a texture avoids the "scattered squares" look)
+const spriteCanvas = document.createElement('canvas'); spriteCanvas.width = spriteCanvas.height = 64;
+const sctx = spriteCanvas.getContext('2d');
+const grad = sctx.createRadialGradient(32,32,0,32,32,32);
+grad.addColorStop(0,'rgba(255,255,255,1)'); grad.addColorStop(0.4,'rgba(255,255,255,0.55)'); grad.addColorStop(1,'rgba(255,255,255,0)');
+sctx.fillStyle = grad; sctx.fillRect(0,0,64,64);
+const spriteTex = new THREE.CanvasTexture(spriteCanvas);
+const pMat = new THREE.PointsMaterial({size:0.9, map:spriteTex, vertexColors:true, transparent:true, opacity:0.85, blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true});
+const particles = new THREE.Points(pGeo, pMat);
+scene.add(particles);
+
+function curl(x,z,t){
+  const e=0.6;
+  const n1 = fbm(uOf(x+e)+t*0.02, vOf(z))-fbm(uOf(x-e)+t*0.02, vOf(z));
+  const n2 = fbm(uOf(x)+t*0.02, vOf(z+e))-fbm(uOf(x)+t*0.02, vOf(z-e));
+  return {dx:n2*3.4, dz:-n1*3.4};
+}
+
+/* ---------------------------------------------------------------------
+   5. Theme (chart palette) + Day/Night cycle
+--------------------------------------------------------------------- */
+const THEMES = {
+  dark: {
+    nightSky:0x030711, daySky:0x1a3a52, nightFog:0x030711, dayFog:0x27556e,
+    nightSun:0x35608a, daySun:0xbfe9ff, waterNight:0x020d15, waterDay:0x0d4a63,
+    shallow:0xd94f37, mid:0x0d3a48, deep:0x020509, label:'🌙 Night Chart'
+  },
+  light: {
+    nightSky:0x1b2f3a, daySky:0xd7e6e2, nightFog:0x24424a, dayFog:0xcfe0dc,
+    nightSun:0x5f88a0, daySun:0xffffff, waterNight:0x123a44, waterDay:0x8fc7c6,
+    shallow:0xe0673f, mid:0x2f7a86, deep:0x143540, label:'☀ Day Chart'
+  }
+};
+let currentTheme = THEMES.dark;
+function applyTheme(name){
+  currentTheme = THEMES[name] || THEMES.dark;
+  paintTerrainColors(currentTheme.shallow, currentTheme.mid, currentTheme.deep);
+}
+applyTheme('dark');
+
+/* sun/moon disc that arcs across the sky, and a faint night starfield */
+const celestialGeo = new THREE.CircleGeometry(6,32);
+const celestialMat = new THREE.MeshBasicMaterial({color:0xffe9c4, transparent:true, opacity:1, blending:THREE.AdditiveBlending, depthWrite:false});
+const celestial = new THREE.Mesh(celestialGeo, celestialMat);
+scene.add(celestial);
+const celestialGlow = new THREE.Mesh(new THREE.CircleGeometry(12,32), new THREE.MeshBasicMaterial({color:0xffe9c4, transparent:true, opacity:0.25, blending:THREE.AdditiveBlending, depthWrite:false}));
+scene.add(celestialGlow);
+
+const STAR_COUNT = 500;
+const starPos = new Float32Array(STAR_COUNT*3);
+for(let i=0;i<STAR_COUNT;i++){
+  const r = 260, th = rand()*Math.PI*2, ph = rand()*Math.PI*0.5;
+  starPos[i*3] = Math.cos(th)*Math.cos(ph)*r;
+  starPos[i*3+1] = 30+Math.sin(ph)*r*0.6;
+  starPos[i*3+2] = Math.sin(th)*Math.cos(ph)*r;
+}
+const starGeo = new THREE.BufferGeometry();
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPos,3));
+const starMat = new THREE.PointsMaterial({color:0xffffff, size:1.1, transparent:true, opacity:0, sizeAttenuation:true});
+const stars = new THREE.Points(starGeo, starMat);
+scene.add(stars);
+
+let simT = 0; // 0..1000 over 10 days
+let playing = true;
+const tlSlider = document.getElementById('tlSlider');
+const playBtn = document.getElementById('playBtn');
+playBtn.textContent = '❚❚';
+playBtn.onclick = ()=>{ playing=!playing; playBtn.textContent = playing ? '❚❚' : '▶'; };
+tlSlider.addEventListener('input', ()=>{ simT = +tlSlider.value; });
+
+function applyTimeOfDay(frac){ // frac 0..1 within a day
+  const th = currentTheme;
+  const cyc = Math.sin(frac*Math.PI*2 - Math.PI/2)*0.5+0.5; // 0 at night, 1 at noon
+  const nightSky = new THREE.Color(th.nightSky), daySky = new THREE.Color(th.daySky);
+  const nightFog = new THREE.Color(th.nightFog), dayFog = new THREE.Color(th.dayFog);
+  const nightSun = new THREE.Color(th.nightSun), daySun = new THREE.Color(th.daySun);
+  const nightWater = new THREE.Color(th.waterNight), dayWater = new THREE.Color(th.waterDay);
+  scene.background = nightSky.clone().lerp(daySky, cyc);
+  scene.fog.color = nightFog.clone().lerp(dayFog, cyc);
+  sun.color = nightSun.clone().lerp(daySun, cyc);
+  sun.intensity = 0.35 + cyc*0.95;
+  ambient.intensity = 0.22 + cyc*0.42;
+  waterMat.color = nightWater.clone().lerp(dayWater, cyc);
+  waterMat.opacity = 0.95 - cyc*0.12;
+
+  const angle = frac*Math.PI*2;
+  const sunY = Math.sin(angle);
+  sun.position.set(Math.cos(angle)*90, 40+sunY*70, Math.sin(angle*0.6)*60);
+  celestial.position.set(sun.position.x*1.9, Math.max(8, sun.position.y*2), sun.position.z*1.9 - 40);
+  celestial.lookAt(camera.position);
+  celestialGlow.position.copy(celestial.position);
+  celestialGlow.lookAt(camera.position);
+  const isNight = cyc < 0.5;
+  celestial.material.color = isNight ? new THREE.Color(0xcfe3ff) : new THREE.Color(0xffe9c4);
+  celestialGlow.material.color = celestial.material.color;
+  const altitude = THREE.MathUtils.clamp(sunY*1.4+0.15, 0, 1);
+  celestial.material.opacity = altitude;
+  celestialGlow.material.opacity = altitude*0.3;
+  starMat.opacity = (1-cyc)*0.75*(1-altitude*0.4);
+}
+
+/* ---------------------------------------------------------------------
+   6. Waypoint click → cutaway camera + UKC readout
+--------------------------------------------------------------------- */
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+canvas.addEventListener('click', e=>{
+  mouse.x = (e.clientX/innerWidth)*2-1;
+  mouse.y = -(e.clientY/innerHeight)*2+1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(wpMarkers);
+  if(hits.length) selectWaypoint(hits[0].object.userData);
+});
+
+let camAnim = null;
+function selectWaypoint(data){
+  const {wp, seabed} = data;
+  const target = routePts[data.idx];
+  const draft = CONFIG.draftMeters;
+  const waterDepth = -seabed;
+  const clearance = waterDepth - draft;
+  const panel = document.getElementById('ukcPanel');
+  panel.style.display='block';
+  document.getElementById('ukcGauge').textContent = clearance.toFixed(1)+' m';
+  document.getElementById('ukcLabel').textContent = wp.name+' — seabed '+waterDepth.toFixed(1)+'m · draft '+draft+'m';
+  const gauge = document.getElementById('ukcGauge');
+  const fill = document.querySelector('#ukcBar .fill');
+  const pct = THREE.MathUtils.clamp((clearance/25)*100, 4, 100);
+  fill.style.width = pct+'%';
+  if(clearance < 4){ gauge.style.color='#ff4757'; fill.style.background='#ff4757'; toast('⚠ '+wp.name+': UKC critical — seabed rising','err'); }
+  else if(clearance < 9){ gauge.style.color='#ffb238'; fill.style.background='#ffb238'; }
+  else { gauge.style.color='#2de1c2'; fill.style.background='#2de1c2'; }
+
+  // camera fly-in cutaway
+  cameraLocked = true;
+  const from = {r:camSpherical.radius, th:camSpherical.theta, ph:camSpherical.phi, tx:camTarget.x, ty:camTarget.y, tz:camTarget.z};
+  const to = {r:26, th:camSpherical.theta+0.6, ph:0.62, tx:target.x, ty:seabed*0.5, tz:target.z};
+  const t0 = performance.now();
+  if(camAnim) cancelAnimationFrame(camAnim);
+  function step(){
+    const t = Math.min(1, (performance.now()-t0)/1100);
+    const ease = t<0.5 ? 2*t*t : -1+(4-2*t)*t;
+    camSpherical.radius = from.r+(to.r-from.r)*ease;
+    camSpherical.theta = from.th+(to.th-from.th)*ease;
+    camSpherical.phi = from.ph+(to.ph-from.ph)*ease;
+    camTarget.x = from.tx+(to.tx-from.tx)*ease;
+    camTarget.y = from.ty+(to.ty-from.ty)*ease;
+    camTarget.z = from.tz+(to.tz-from.tz)*ease;
+    updateCameraFromSpherical();
+    if(t<1) camAnim = requestAnimationFrame(step); else cameraLocked=false;
+  }
+  camAnim = requestAnimationFrame(step);
+}
+
+/* ---------------------------------------------------------------------
+   7. Render loop
+--------------------------------------------------------------------- */
+const clock = new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.getElapsedTime();
+
+  if(playing){ 
+    simT += dt*22; 
+    if(simT >= 1000) {
+      simT = 1000;
+      playing = false;
+      document.getElementById('playBtn').textContent = '▶';
+      triggerCiiReport();
+    }
+    tlSlider.value = simT; 
+  }
+  const dayFrac = (simT/1000);
+  const dayIdx = Math.floor(dayFrac*10)+1;
+  document.getElementById('tlDayLabel').textContent = 'DAY '+dayIdx+' · '+String(Math.floor((dayFrac*10%1)*24)).padStart(2,'0')+':00 UTC';
+  applyTimeOfDay((dayFrac*10)%1);
+
+  // ship position along route
+  const routeT = dayFrac;
+  if(routeCurve){
+    const pos = routeCurve.getPointAt(Math.min(0.999,routeT));
+    shipGroup.position.copy(pos);
+    shipGroup.position.y += Math.sin(t*1.1)*0.25; // gentle bob with the swell
+    shipGroup.rotation.z = Math.sin(t*0.9)*0.03;   // subtle roll
+    const tangent = routeCurve.getTangentAt(Math.min(0.999,routeT));
+    shipGroup.rotation.y = Math.atan2(tangent.x, tangent.z);
+    sweepGroup.position.copy(pos);
+    sweepGroup.rotation.y = t*1.4;
+
+    wakeTrail.unshift(pos.clone());
+    if(wakeTrail.length>WAKE_LEN) wakeTrail.pop();
+    for(let i=0;i<WAKE_LEN;i++){
+      const p = wakeTrail[i] || pos;
+      wakePositions[i*3]=p.x; wakePositions[i*3+1]=p.y+0.3; wakePositions[i*3+2]=p.z;
+      const f = 1 - i/WAKE_LEN;
+      wakeColors[i*3]=0.09+f*0.9; wakeColors[i*3+1]=0.55+f*0.15; wakeColors[i*3+2]=0.42;
+    }
+    wakeGeo.attributes.position.needsUpdate = true;
+    wakeGeo.attributes.color.needsUpdate = true;
+
+    // fuel score + distance HUD
+    const fuel = (100 - routeT*100*0.62 + Math.sin(t*0.3)*1.2).toFixed(1);
+    document.getElementById('fuelScore').textContent = fuel;
+    document.getElementById('distTraveled').textContent = Math.round(routeT*1247)+' nm';
+    document.getElementById('statPos').textContent = shipState_lat(routeT)+'°N '+shipState_lon(routeT)+'°E';
+  }
+
+  // gentle ocean swell on the water surface
+  const wArr = waterGeo.attributes.position.array;
+  for(let i=0;i<wArr.length;i+=3){
+    const bx = waterBasePos[i], bz = waterBasePos[i+2];
+    wArr[i+1] = Math.sin(bx*0.12 + t*0.6)*0.55 + Math.cos(bz*0.1 + t*0.45)*0.55;
+  }
+  waterGeo.attributes.position.needsUpdate = true;
+  waterGeo.computeVertexNormals();
+
+  // wind particles via curl noise
+  const posArr = pGeo.attributes.position.array;
+  for(let i=0;i<PARTICLE_COUNT;i++){
+    const x=posArr[i*3], z=posArr[i*3+2];
+    const c = curl(x*0.01+37, z*0.01+11, t);
+    posArr[i*3]   += c.dx*dt;
+    posArr[i*3+2] += c.dz*dt;
+    if(posArr[i*3] > BOUND) posArr[i*3] = -BOUND;
+    if(posArr[i*3] < -BOUND) posArr[i*3] = BOUND;
+    if(posArr[i*3+2] > BOUND) posArr[i*3+2] = -BOUND;
+    if(posArr[i*3+2] < -BOUND) posArr[i*3+2] = BOUND;
+  }
+  pGeo.attributes.position.needsUpdate = true;
+
+  beaconSprite.material.color.setHSL(0.48, 1, 0.5+Math.sin(t*3)*0.15);
+
+  renderer.render(scene, camera);
+}
+function shipState_lat(rt){ const wps=routeState.waypoints; const lats=wps.map(w=>w.lat); return (lats[0]+(lats[lats.length-1]-lats[0])*rt).toFixed(2); }
+function shipState_lon(rt){ const wps=routeState.waypoints; const lons=wps.map(w=>w.lon); return (lons[0]+(lons[lons.length-1]-lons[0])*rt).toFixed(2); }
+
+window.hasReportedCii = false;
+async function triggerCiiReport(){
+  if(window.hasReportedCii) return;
+  window.hasReportedCii = true;
+  toast('Voyage ended. Transmitting telemetry for CII compliance...', 'warn');
+  
+  // Wait a second for dramatic effect
+  setTimeout(async () => {
+    try {
+      const fuelVal = document.getElementById('fuelScore').textContent;
+      const distVal = document.getElementById('distTraveled').textContent;
+      // Convert UI display values back to raw numbers
+      const distNum = parseFloat(distVal.replace(/[^\d.-]/g, '')) || 1200;
+      // In our UI, fuelScore is a 0-100 index. We'll extrapolate a realistic fuel amount for the report.
+      // E.g. A 50,000 DWT ship burns ~30 tons/day. 10 days = 300,000 kg.
+      // We will scale it inversely by fuelScore so a higher score means LESS fuel burned.
+      const efficiencyMult = 1.0 - ((parseFloat(fuelVal)-80)/100); 
+      const totalFuelKg = 300000 * Math.max(0.6, efficiencyMult);
+      
+      const payload = {
+        vessel_id: activeFleetId,
+        route_name: routeState.name || routeState.route_id,
+        total_fuel_kg: totalFuelKg,
+        distance_nm: distNum,
+        duration_hrs: 240 // Assuming a 10 day standard window for our UI timeline
+      };
+      
+      const res = await fetch(CONFIG.apiBase.replace(/\/$/,'') + '/api/report/cii', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      
+      if(data.html){
+        document.getElementById('ciiReportModal').style.display = 'flex';
+        document.getElementById('btnViewCii').onclick = () => {
+          const blob = new Blob([data.html], {type: 'text/html'});
+          const url = URL.createObjectURL(blob);
+          window.open(url, '_blank');
+        };
+      }
+    } catch(err) {
+      toast('Failed to auto-generate CII report: ' + err.message, 'err');
+    }
+  }, 1500);
+}
+
+animate();
+
+addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* ---------------------------------------------------------------------
+   8. WebSocket client — connects to the onshore backend, autonomous
+      NEW_ROUTE_DISPATCHED handling, exponential-backoff reconnect,
+      heartbeat, and a demo fallback if no backend is reachable.
+--------------------------------------------------------------------- */
+let ws = null, reconnectAttempts = 0, heartbeatTimer = null, demoTimer = null, usingDemo = false;
+const connStatus = document.getElementById('connStatus');
+const connLabel = document.getElementById('connLabel');
+
+function setConnUI(state, label){
+  connStatus.className = state;
+  connLabel.textContent = label;
+}
+
+function connectWS(){
+  clearTimeout(demoTimer); usingDemo = false;
+  setConnUI('connecting', 'Connecting…');
+  try{
+    ws = new WebSocket(CONFIG.wsUrl);
+  }catch(err){
+    onWSFail(); return;
+  }
+  ws.onopen = ()=>{
+    reconnectAttempts = 0;
+    setConnUI('online', 'LIVE');
+    toast('Connected to onshore backend');
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = setInterval(()=>{ if(ws.readyState===1) ws.send(JSON.stringify({type:'ping'})); }, 30000);
+  };
+  ws.onmessage = (ev)=>{
+    let msg;
+    try{ msg = JSON.parse(ev.data); }catch(e){ return; }
+    if(msg.event === 'NEW_ROUTE_DISPATCHED' && msg.route){
+      applyDispatchedRoute(msg.route);
+      toast('New route dispatched: '+msg.route.route_id);
+    }
+  };
+  ws.onclose = ()=>{ setConnUI('offline','Disconnected'); scheduleReconnect(); };
+  ws.onerror = ()=>{ onWSFail(); };
+}
+function onWSFail(){
+  setConnUI('offline','Backend unreachable');
+  scheduleReconnect();
+}
+function scheduleReconnect(){
+  clearInterval(heartbeatTimer);
+  reconnectAttempts++;
+  const delay = Math.min(30000, 1000*Math.pow(1.7, reconnectAttempts));
+  if(reconnectAttempts >= 3 && !usingDemo){
+    enterDemoMode();
+  }
+  setTimeout(connectWS, delay);
+}
+function enterDemoMode(){
+  usingDemo = true;
+  setConnUI('demo', 'Demo mode — no backend found');
+  toast('No backend reachable. Running in local demo mode so the UI stays live.', 'warn');
+  demoTimer = setInterval(()=>{
+    if(!usingDemo) return;
+    // simulate a small route perturbation, as the autonomous backend would push
+    const jitter = () => (Math.random()-0.5)*0.6;
+    const newWps = routeState.waypoints.map(w=>({...w, lat:w.lat+jitter()*0.15, lon:w.lon+jitter()*0.15}));
+    applyDispatchedRoute({route_id:'rt_demo_'+Math.random().toString(36).slice(2,7), waypoints:newWps}, true);
+  }, 25000);
+}
+function applyDispatchedRoute(route, silent){
+  // If we already eagerly applied this route locally, ignore the WebSocket echo to prevent stripping local visual state!
+  if (routeState && routeState.route_id === route.route_id) return;
+  
+  routeState = {route_id: route.route_id, name: routeState.name, waypoints: route.waypoints.length ? route.waypoints : routeState.waypoints};
+  rebuildRouteVisuals();
+  if(!silent){
+    document.getElementById('shipNextWp').textContent = routeState.waypoints[1] ? routeState.waypoints[1].name : '—';
+  }
+}
+
+connectWS();
+
+/* ---------------------------------------------------------------------
+   9. Force-dispatch helper — POST /api/force-dispatch (used by the
+      "Send Selected → Ship Bridge" QML workflow below)
+--------------------------------------------------------------------- */
+async function postForceDispatch(routeId, waypoints){
+  try{
+    const res = await fetch(CONFIG.apiBase.replace(/\/$/,'') + '/api/force-dispatch', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({route_id: routeId, waypoints})
+    });
+    return res.ok;
+  }catch(err){
+    return false;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   10. RTZ export (onshore) and import (ship) — Route Exchange Format
+--------------------------------------------------------------------- */
+document.getElementById('exportRtzBtn').onclick = async ()=>{
+  const chosen = [...selectedVariants].map(k=>qmlVariants[k]).filter(Boolean);
+  const routeToExport = chosen.length > 0 ? chosen[0] : routeState;
+  
+  const wpXml = routeToExport.waypoints.map(w =>
+    `    <waypoint id="${w.id || w.name}" name="${w.name}">\n      <position lat="${w.lat}" lon="${w.lon}"/>\n    </waypoint>`
+  ).join('\n');
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<route version="1.1" xmlns="http://www.cirm.org/RTZ/1/1">\n  <routeInfo routeName="${routeToExport.name || routeToExport.label || 'EXPORTED_ROUTE'}" optimizationStrategy="${routeToExport.type || ''}"/>\n  <waypoints>\n${wpXml}\n  </waypoints>\n</route>`;
+  
+  // Push to backend for the Ship Bridge to fetch
+  try {
+    await fetch(CONFIG.apiBase.replace(/\/$/,'') + '/api/rtz/upload', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/xml'},
+      body: xml
+    });
+    toast('Route published to Onshore RTZ Repository');
+  } catch(err) {
+    toast('Failed to publish RTZ to repository', 'err');
+  }
+
+  const blob = new Blob([xml], {type:'application/xml'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = routeState.route_id + '.rtz';
+  a.click();
+};
+
+document.getElementById('importZone').innerHTML = '<p>⤓ PULL LATEST RTZ FROM ONSHORE</p>';
+document.getElementById('importZone').onclick = async ()=>{
+  try {
+    const res = await fetch(CONFIG.apiBase.replace(/\/$/,'') + '/api/rtz/download');
+    if(!res.ok) throw new Error(await res.text());
+    const xmlText = await res.text();
+    
+    const xml = new DOMParser().parseFromString(xmlText, 'application/xml');
+    const perr = xml.querySelector('parsererror');
+    if(perr) throw new Error('Malformed RTZ XML');
+    const wpNodes = [...xml.getElementsByTagNameNS('*','waypoint')].length ? [...xml.getElementsByTagNameNS('*','waypoint')] : [...xml.getElementsByTagName('waypoint')];
+    const wps = wpNodes.map((n,i)=>{
+      const posEl = n.getElementsByTagNameNS('*','position')[0] || n.getElementsByTagName('position')[0];
+      return {
+        id: n.getAttribute('id') || (i+1),
+        name: n.getAttribute('name') || ('WP'+(i+1)),
+        lat: parseFloat(posEl.getAttribute('lat')),
+        lon: parseFloat(posEl.getAttribute('lon')),
+      };
+    });
+    const routeInfo = xml.getElementsByTagNameNS('*','routeInfo')[0] || xml.getElementsByTagName('routeInfo')[0];
+    const routeName = routeInfo ? routeInfo.getAttribute('routeName') : 'IMPORTED_ROUTE';
+    const strategy = routeInfo ? routeInfo.getAttribute('optimizationStrategy') : null;
+    
+    // Clear all AI overlays from the 3D map since the user is overriding the route
+    // We intentionally DO NOT clear qmlVariants so the left panel cards remain visible
+    selectedVariants.clear();
+    autoHijackFastest = false;
+    renderQmlCards();
+    renderVariantOverlays();
+    
+    routeState = {type: strategy, route_id: 'rtz_import_'+Date.now().toString(36), name: routeName, waypoints: wps};
+    rebuildRouteVisuals(false); // Do not trigger AI recalculation
+    
+    toast('Imported '+wps.length+' waypoints from Onshore Repository');
+    document.getElementById('shipLink').textContent = 'SatCom — offline (RTZ loaded)';
+    document.getElementById('shipAlert').style.display = 'block';
+    setTimeout(()=> document.getElementById('shipAlert').style.display='none', 5000);
+  } catch(err) {
+    toast('Could not pull RTZ: '+err.message, 'err');
+  }
+};
+
+/* initial ship next-waypoint label */
+document.getElementById('shipNextWp').textContent = routeState.waypoints[1] ? routeState.waypoints[1].name : '—';
+
+/* ---------------------------------------------------------------------
+   11. QML strategy dispatch — onshore selects Fastest/Eco/Safest
+       (one or several) and sends them to the Ship Bridge as candidates.
+--------------------------------------------------------------------- */
+function hexStr(n){ return '#'+n.toString(16).padStart(6,'0'); }
+
+function renderCandidateList(){
+  const wrap = document.getElementById('candidateList');
+  const confirmBtn = document.getElementById('confirmCandidateBtn');
+  if(!candidateRoutesForShip.length){
+    wrap.innerHTML = '<div id="noCandidates">No candidates proposed yet</div>';
+    confirmBtn.style.display = 'none';
+    return;
+  }
+  wrap.innerHTML = candidateRoutesForShip.map((c,i)=>`
+    <label class="candRow">
+      <input type="radio" name="candPick" value="${c.type}" ${pickedCandidateKey===c.type?'checked':''}>
+      <span class="dot" style="background:${hexStr(c.color)}"></span>
+      <span class="nm">${c.label} · ETA ${c.metrics.eta_hrs.toFixed(1)}h · Fuel ${Math.round(c.metrics.fuel_rate)}kg · Roll ${c.metrics.roll_risk.toFixed(3)}</span>
+    </label>`).join('');
+  wrap.querySelectorAll('input[name=candPick]').forEach(r=>{
+    r.addEventListener('change', e=>{ pickedCandidateKey = e.target.value; });
+  });
+  confirmBtn.style.display = candidateRoutesForShip.length > 1 ? 'block' : 'none';
+}
+
+function activateCandidate(candidate){
+  autoHijackFastest = false;
+  
+  // Clear the translucent AI overlays from the 3D map
+  // We intentionally DO NOT clear qmlVariants so the left panel cards remain visible
+  selectedVariants.clear();
+  renderQmlCards();
+  renderVariantOverlays();
+  
+  routeState = {type:candidate.type, route_id:candidate.route_id, name:routeState.name, waypoints:candidate.waypoints};
+  rebuildRouteVisuals(false); // Don't trigger AI, we already have the routes
+  toast('Ship Bridge now sailing the '+candidate.label+' route');
+  document.getElementById('shipAlert').style.display = 'none';
+}
+
+document.getElementById('confirmCandidateBtn').onclick = ()=>{
+  const chosen = candidateRoutesForShip.find(c=>c.type===pickedCandidateKey) || candidateRoutesForShip[0];
+  activateCandidate(chosen);
+};
+
+document.getElementById('sendToShipBtn').onclick = async ()=>{
+  const chosen = [...selectedVariants].map(k=>qmlVariants[k]).filter(Boolean);
+  if(!chosen.length){ toast('Select at least one route option first', 'warn'); return; }
+  candidateRoutesForShip = chosen;
+  pickedCandidateKey = chosen[0].type;
+  renderCandidateList();
+  toast('Sent '+chosen.length+' candidate route'+(chosen.length>1?'s':'')+' to Ship Bridge');
+  postForceDispatch(chosen[0].route_id, chosen[0].waypoints);
+  if(chosen.length === 1) activateCandidate(chosen[0]);
+};
+</script>
+</body>
+</html>

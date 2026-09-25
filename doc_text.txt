@@ -1,0 +1,692 @@
+System Architecture & Technical Specification
+
+Quantum-Classical Cost Model, Hard Filters & Time-Dependent Route Search Engine
+
+Downstream pipeline: from the CNN + MLP fusion vector ẓ to the final optimized, safety-checked ship route. Quantum layer specified for 15 qubits, simulated on classical hardware.
+
+Module scope: everything after ẓ = concat(ẓ_weather, ẓ_vessel) is produced upstream
+
+
+
+1. Executive Summary & Core Objective
+
+This document specifies everything that happens after the upstream CNN (spatial weather encoder) and MLP (vessel/voyage encoder) produce the 96-dimensional fusion vector ẓ. It covers the quantum-classical cost model that scores candidate route segments, the hard filters that remove physically unsafe or illegal segments before any learned model touches them, the time-dependent graph search that assembles a route, the safety and regulatory checks applied to that route, the 6-hourly rolling re-optimization loop, and the final output schema handed to the vessel.
+
+The quantum component is a 15-qubit variational circuit, simulated entirely on classical hardware — no physical quantum processor is used at any stage. This has two direct architectural consequences documented throughout this spec: (1) training uses ordinary backpropagation through the simulated circuit rather than parameter-shift or SPSA gradient estimation, and (2) inference computes exact expectation values from the statevector rather than shot-sampled estimates, so there is no sampling noise to average out.
+
+1.1 Position in the Overall Pipeline
+
+Stage
+
+Owner
+
+Nature
+
+Covered here?
+
+CNN spatial branch
+
+Upstream team
+
+Classical NN, trained
+
+No — input only
+
+MLP vessel branch
+
+Upstream team
+
+Classical NN, trained
+
+No — input only
+
+Fusion → ẓ (96-D)
+
+Upstream team
+
+Concatenation
+
+No — input only
+
+Adapter + quantum cost model
+
+This module
+
+Classical + simulated quantum, trained
+
+Yes — §2
+
+Hard filters (static + dynamic)
+
+This module
+
+Deterministic, zero-AI
+
+Yes — §3
+
+4D-MODIP wavefront search
+
+This module
+
+Classical algorithm (multi-objective)
+
+Yes — §6
+
+Safety & compliance checks
+
+This module
+
+Deterministic formulas
+
+Yes — §5
+
+Rolling horizon re-routing
+
+This module
+
+Orchestration loop
+
+Yes — §6
+
+Final route output
+
+This module
+
+Schema
+
+Yes — §7
+
+2. Input Specification & Feature Augmentation
+
+2.1 Incoming Fusion Vector
+
+ẓ_fusion = [ ẓ_weather (64-D) ‖ ẓ_vessel (32-D) ] ∈ ℝ⁹⁶
+
+ẓ_weather is the CNN's global-average-pooled encoding of the (6–8, 64, 64) weather/ocean grid. ẓ_vessel is the MLP's encoding of vessel length, beam, draft, speed-over-ground, and heading. Both are produced per candidate edge, per query time — not once for the whole voyage (see §4.2).
+
+2.2 Feature Augmentation: Relative Encounter Angle
+
+The single strongest physical predictor of drag and roll risk is the ship-relative direction of the weather, not its raw magnitude. This is a scalar buried inside a 96-D blend unless it is explicitly re-injected. Before the adapter layer, this module computes:
+
+θ_enc = | θ_weather − θ_ship |
+
+θ_weather (wave/wind direction) comes from the CNN's own directional channel; θ_ship (heading) comes from the MLP's vessel state. Because θ_enc is a circular quantity (0° and 360° are the same heading), it is encoded as two features rather than one raw angle, avoiding a false discontinuity at the wraparound point:
+
+ẓ_input = [ ẓ_fusion (96-D) ‖ sin(θ_enc) ‖ cos(θ_enc) ] ∈ ℝ⁹⁸
+
+ẓ_input, dimension d = 98, is the true input to the adapter layer defined in §2.
+
+3. Quantum-Classical Cost Model
+
+This is a single differentiable module: adapter → quantum encoding → variational ansatz → measurement → physical-unit readout. Because the quantum circuit is simulated on classical hardware, the entire chain is one ordinary computational graph trained end-to-end with backpropagation — there is no separate “train the quantum part differently” step.
+
+3.1 Adapter Layer
+
+Projects the 98-D input onto N = 15 qubit rotation angles and guarantees the encoding range required by §3.2.
+
+ẓ̂ = LayerNorm(ẓ_input)
+
+ẓ_proj = π · tanh( W_c ẓ̂ + b_c ),   W_c ∈ ℝ¹⁵ˣ⁹⁸,  b_c ∈ ℝ¹⁵
+
+Every component of ẓ_proj lies strictly within (−π, π), which is required for the angle-encoding step below to be well-posed regardless of the raw scale or distribution of ẓ_input. This layer carries 98×15 + 15 = 1,485 trainable classical parameters.
+
+3.2 Quantum Encoding Layer (15 qubits)
+
+Each of the 15 components of ẓ_proj is mapped to a rotation on its own qubit:
+
+|ψ(ẓ_proj)⟩ = ⨂ᵢ₌₁¹⁵ R_z(z_proj,ᵢ) R_y(z_proj,ᵢ) |0⟩
+
+Data re-uploading: rather than encoding once, the same rotation block is re-applied before every variational layer, so the circuit sees the environment/vessel state L times, not once — this compensates for whatever detail the 98→15 compression discarded:
+
+U(θ) = ∏ₗ₌₁^L [ Wₗ(θₗ) · S(ẓ_proj) ]
+
+where S(ẓ_proj) is the encoding unitary above and Wₗ(θₗ) is the trainable block for layer ℓ, defined next.
+
+3.3 Variational Ansatz
+
+Each layer ℓ applies a full single-qubit rotation to every qubit followed by a ring of entangling CNOTs:
+
+Wₗ(θₗ) = ( ∏ᵢ₌₀¹⁴ CNOT_{i,(i+1) mod 15} ) · ( ⨂ⱼ₌₀¹⁴ R_z(θⱼ,ₗ,₃) R_y(θⱼ,ₗ,₂) R_z(θⱼ,ₗ,₁) )
+
+With L = 4 layers and 3 trainable rotation angles per qubit per layer: 3 × 15 × 4 = 180 trainable quantum parameters. The CNOT ring (including the wraparound CNOT₁₄,₀) ensures every qubit becomes entangled with every other qubit within two layers, so the circuit can express correlations between distant components of the original 98-D input — e.g. between the wind channel and the vessel's draft.
+
+3.4 Measurement & Physical-Unit Readout — 10 Outputs
+
+Ten of the fifteen qubits are measured in the Pauli-Z basis; the remaining five (q10–q14) stay unmeasured and contribute entanglement/expressivity only:
+
+⟨Zₖ⟩ = ⟨ψ(ẓ_proj)| U†(θ) Ẑₖ U(θ) |ψ(ẓ_proj)⟩,  k ∈ {0, …, 9}
+
+Because this is computed from the exact simulated statevector (32,768-dimensional for 15 qubits), every ⟨Zₖ⟩ is an exact real number in [−1, 1] — no shot averaging, no sampling variance. Each is rescaled into physical units, or interpreted directly as a probability, via a per-qubit readout calibrated against the training label distribution (see §4.1):
+
+Qubit
+
+Quantity
+
+Decode formula
+
+Range / units
+
+q0
+
+Fuel burn rate
+
+((⟨Z₀⟩+1)/2) · F_max
+
+0–F_max kg/NM
+
+q1
+
+Wave drag (added resistance)
+
+((⟨Z₁⟩+1)/2) · R_max
+
+0–R_max kN
+
+q2
+
+Speed loss ΔV
+
+((⟨Z₂⟩+1)/2) · ΔV_max
+
+0–ΔV_max kn
+
+q3
+
+Roll risk
+
+(⟨Z₃⟩+1)/2
+
+0–1 probability
+
+q4
+
+Slamming force
+
+((⟨Z₄⟩+1)/2) · S_max
+
+0–S_max kN
+
+q5
+
+Windage (wind) resistance
+
+((⟨Z₅⟩+1)/2) · R_wind,max
+
+0–R_wind,max kN
+
+q6
+
+Comfort index (vertical accel.)
+
+((⟨Z₆⟩+1)/2) · a_max
+
+0–a_max m/s² RMS
+
+q7
+
+Green-water / deck-wetness risk
+
+(⟨Z₇⟩+1)/2
+
+0–1 probability
+
+q8
+
+Propeller emergence risk
+
+(⟨Z₈⟩+1)/2
+
+0–1 probability
+
+q9
+
+Prediction confidence
+
+|⟨Z₉⟩|
+
+0 (uncertain) – 1 (confident)
+
+F_max, R_max, ΔV_max, S_max, R_wind,max and a_max are fixed scaling constants set to the 99th percentile of the corresponding label in the training set (see §4.1) — not arbitrary values — so each sigmoid-like readout has headroom for the great majority of real sea states without saturating.
+
+The confidence output (q9) has a genuinely quantum-native interpretation: |⟨Z₉⟩| close to 1 means the circuit has settled into a near-definite state for this input (confident); close to 0 means the state remains in superposition across outcomes (uncertain). As a more rigorous alternative or cross-check, Monte Carlo dropout on the adapter layer (§3.1) across a handful of forward passes gives a direct prediction-variance estimate at negligible extra cost, since each pass is sub-millisecond.
+
+3.5 Why Classical Simulation, Not Physical Quantum Hardware
+
+No sampling noise: exact statevector expectation values replace shot-based estimation, so §3.4's outputs are deterministic given ẓ_proj and θ.
+
+No cloud latency or queueing: everything runs in-process; there is no network round-trip or job queue to reason about.
+
+Exact gradients via autodiff: because the simulator is differentiable, the whole adapter→encoding→ansatz→measurement→readout chain trains with standard backpropagation, not parameter-shift or SPSA (both of which exist specifically to work around physical hardware not being backprop-able).
+
+No distillation required: a physical-QPU deployment would need a distilled classical stand-in purely for latency reasons; a simulated circuit already is a classical computation, so the trained model can be used directly at inference with no separate distillation step.
+
+3.6 Computational Complexity
+
+Quantity
+
+Value (N = 15, L = 4)
+
+Notes
+
+Statevector dimension
+
+2¹⁵ = 32,768 complex amplitudes
+
+~512 KB per sample in double precision
+
+Measured qubits / unmeasured
+
+10 measured (q0–q9) / 5 entangling-only (q10–q14)
+
+unmeasured qubits still shape the joint state via the ansatz
+
+Trainable quantum parameters
+
+3 × 15 × 4 = 180
+
+rotation angles θⱼ,ₗ,ₘ, shared across all 10 outputs
+
+Trainable classical parameters
+
+1,485 (adapter) + 10-unit readout
+
+Dense(98→15) + bias + per-output rescale constants
+
+Forward pass latency (single sample, CPU)
+
+sub-millisecond to a few ms
+
+batchable across many candidate edges at once
+
+Recommended simulator
+
+PennyLane default.qubit / lightning.qubit with a PyTorch or TensorFlow interface
+
+gives autodiff through the circuit for free
+
+4. Training Strategy
+
+4.1 Ground-Truth Label Generation
+
+Training labels are generated the same way the upstream CNN document generates them for its own classical regression head — by running naval empirical formulas (VISIR-2 / ITTC-78 / Holtrop-Mennen) over sampled weather slices and ship specifications:
+
+R_wave,true (kN): added wave resistance from the Holtrop-Mennen / ITTC-78 formulation
+
+F_rate,true (kg/NM): fuel burn rate implied by the resulting required power and the vessel's SFOC curve
+
+Using identical ground truth to the upstream classical regression head is deliberate: it gives a direct, same-data ablation between the classical cost predictor and this quantum-augmented one, rather than an apples-to-oranges comparison.
+
+4.2 Loss Function
+
+Both targets are standardized to zero mean / unit variance before computing the loss (their raw scales differ by roughly an order of magnitude), then de-standardized at inference:
+
+L(θ, W_c) = (1/B) Σᵢ₌₁^B [ (R̂_wave,ᵢ − R_wave,true,ᵢ)² + λ (F̂_rate,ᵢ − F_rate,true,ᵢ)² ]
+
+with λ a weighting term tuned on a validation split so neither target dominates the gradient.
+
+4.3 Optimizer & Differentiation
+
+Setting
+
+Value
+
+Differentiation method
+
+Automatic differentiation (backprop) through the simulated circuit — not parameter-shift, not SPSA
+
+Optimizer
+
+Adam, learning rate 1e-3 with cosine decay
+
+Batch size
+
+256 (weather-slice, vessel-spec) pairs
+
+Stopping criterion
+
+Early stopping on a held-out validation split (patience ~15 epochs)
+
+Trained jointly or frozen upstream?
+
+Adapter + quantum cost model train on the received ẓ; CNN/MLP weights stay frozen from the upstream team unless joint end-to-end fine-tuning is explicitly agreed, since the simulator is differentiable enough to support that too if desired
+
+4.4 Software Stack
+
+Quantum simulation + autodiff: PennyLane (default.qubit or lightning.qubit device) with a PyTorch interface
+
+Classical layers (adapter, readout): standard PyTorch nn.Module, trained in the same optimizer step as the quantum layer
+
+Label generation: a small offline script implementing Holtrop-Mennen / ITTC-78 formulas, run once to build the training set
+
+5. Hard Filter Architecture (Zero-AI Constraints)
+
+Hard filters never see ẓ and are never learned. They run before the graph search touches a candidate edge, and their outcome is binary: an edge is either navigable or it is removed from the graph entirely. There are two independent filters.
+
+5.1 Static Filter — Bathymetry & Shoreline
+
+Computed once per operational region and cached, using GEBCO (depth) and GSHHG (shoreline):
+
+UKC(u) = Depth(u) − Draft − Margin_safety
+
+An edge (u, v) is valid only if UKC(u) > 0 and UKC(v) > 0, and if no point sampled along the great-circle segment between u and v (sampled every ~5 NM) has UKC ≤ 0 or crosses a GSHHG shoreline polygon — both checks are necessary, since a shallow strait can have positive UKC at its endpoints while still being unsafe or crossing land between them.
+
+5.2 Dynamic Filter — Extreme Weather No-Go Gate
+
+Reuses the same ERA5 wind/wave grid already fetched for the CNN — no separate dataset fetch is required. Evaluated per node, per query time (see §6.2), independently of the quantum cost model:
+
+No-Go(u, t) = TRUE  if  H_s(u,t) ≥ 8.0 m   OR   |wind(u,t)| ≥ 25.7 m/s (50 kt)
+
+This is a hard safety gate, not a preference the cost model can trade off against fuel savings — an edge failing this test is removed from the graph for that time slice regardless of what the quantum cost model predicts.
+
+6. 4D-MODIP: Time-Dependent Wavefront Search with Pareto-Frontier Pruning
+
+4D-MODIP (Multi-Objective Dynamic Isochrone Propagation) replaces a single scalar-weighted A* search with a continuous wavefront that carries multiple objectives forward simultaneously and prunes by Pareto dominance rather than by collapsing everything into one weighted cost. This removes the need to pre-commit to arbitrary weights between fuel, time, and risk — tradeoffs that genuinely have no single right answer are kept alive on the frontier until the search reaches the destination.
+
+6.1 Wavefront Representation
+
+The frontier at elapsed time T is a set of candidate ship states, each an unstructured point (not a fixed grid node): position, heading, cumulative objective vector, and a backpointer to its parent state for route reconstruction. This is the key structural difference from §5's static grid: the wavefront's positions are continuous and generated dynamically, while the hard filters from §5 still operate on the same underlying bathymetry/shoreline/weather data to validate any candidate the wavefront proposes.
+
+6.2 Elapsed-Time Weather Query
+
+Unchanged in principle from a standard time-dependent search: weather moves, so a point reached several days out must be scored against the forecast valid for when the ship will actually be there.
+
+V_actual(u,v) = V_stw − ΔV̂(u,v,t_query)     [§3.4, q2]
+
+SOG(u,v) = V_actual(u,v) + current_projection(u,v)
+
+T_elapsed(v) = T_elapsed(u) + Δdist(u,v) / SOG(u,v)
+
+t_query(v) = T_depart + T_elapsed(v)
+
+The quantum cost model (§3) and the dynamic no-go gate (§5.2) are queried against the forecast time-slice nearest t_query(v), interpolated between bracketing 6-hourly forecast cycles.
+
+6.3 Multi-Objective Candidate Generation
+
+At each propagation step Δt, every surviving frontier point u generates a fan of candidate headings (e.g. every 15° within ±60° of the bearing to destination). For each candidate v, reach distance uses the QML's own speed-loss prediction (§3.4, q2) directly — the model is telling the search how far the ship can actually get, not just how much it costs to get there:
+
+reach(u → v) = position(u) + SOG(u,v) · Δt  along candidate heading
+
+Each candidate carries a 5-dimensional running objective vector, accumulated from §3.4's outputs along the path so far:
+
+obj(v) = [ Σ F̂_rate·Δdist,  Σ (R̂_wave+R̂_wind)·Δdist,  T_elapsed(v),  max(Roll_risk),  max(Slam_force) ]
+
+Candidates landing on a cell already excluded by the hard filters (§5.1, §5.2) are discarded before objective evaluation — the wavefront never has the option to enter an illegal or extreme-weather cell in the first place.
+
+6.4 Pareto-Frontier Pruning
+
+Candidate A dominates candidate B if A is at least as good as B on every objective in obj(·) and strictly better on at least one:
+
+A ≻ B  ⇔  ∀i: obj(A)ᵢ ≤ obj(B)ᵢ  ∧  ∃j: obj(A)ⱼ < obj(B)ⱼ
+
+After all frontier points generate their candidates for this step, any candidate dominated by another is dropped; only the non-dominated (Pareto-optimal) set propagates to the next step. This keeps the wavefront's size bounded without collapsing genuinely different tradeoffs — a cheap-but-slower route and a fast-but-costlier route can both survive if neither dominates the other, all the way to the destination.
+
+Confidence (§3.4, q9) is used as a tie-breaker and a caution multiplier rather than a sixth Pareto objective: low-confidence candidates have their Roll_risk and Slam_force objectives inflated by a configurable margin before dominance is evaluated, so the search is automatically more conservative in weather conditions unlike anything in the training data.
+
+6.5 Termination & Route Reconstruction
+
+Propagation continues, re-synced against newly available forecast slices as needed (§6.2), until at least one frontier point falls within a capture radius of the destination. At that point, every surviving non-dominated state at the destination represents a genuinely different, equally “optimal” tradeoff. Rather than forcing a single scalar answer, the system backtraces each of these through its parent chain and can present the operator with a short labeled list — e.g. fastest, cheapest, and most comfortable — all Pareto-optimal, letting a human make the final call where the objectives genuinely conflict.
+
+7. Safety & Regulatory Compliance Layer
+
+Applied leg-by-leg to whatever route(s) the search in §6 returns, before finalization.
+
+Note on relationship to §6: the QML's own Roll_risk, Slam_force and comfort outputs (§3.4, q3/q4/q6) already shape which candidates survive Pareto pruning during the search itself — this section is a deterministic backstop, not a duplicate of that learned signal. A route can only pass through here if it also satisfies the hard, rule-based physical limits below, independent of what the model predicted.
+
+7.1 Seakeeping — Parametric & Synchronous Roll
+
+Wave celerity and encounter period, from the standard deep-water dispersion relation:
+
+c = g · T_m / (2π)
+
+T_enc = T_m / | 1 − (V_stw · cosθ_enc) / c |
+
+A leg is flagged for parametric-roll risk when all of the following hold, consistent with IMO's Second Generation Intact Stability guidance:
+
+H_s(leg) exceeds a vessel-class-calibrated threshold (typically ~4 m)
+
+0.8 × T_roll ≤ T_enc ≤ 1.2 × T_roll (near-resonance with the vessel's natural roll period)
+
+θ_enc falls in the following/quartering sector (0–45° or 135–180°)
+
+On a flag, the response is a local speed adjustment (§7.2), not a route rejection, since a small speed change often shifts T_enc out of resonance.
+
+7.2 Passenger / Crew Comfort — ISO 2631
+
+Predicted vertical acceleration is estimated proportionally to wave height and encounter geometry, calibrated against the ITTC/VISIR seakeeping tables:
+
+â_v ≈ k_v · H_s · g(V_stw, θ_enc)
+
+compared to the ISO 2631-1 reduced-comfort boundary for the leg's expected duration. If â_v exceeds the boundary, speed is reduced in 1-knot steps and the leg is re-scored (re-querying §3 and §7.1) until compliant or a minimum safe-speed floor is reached.
+
+7.3 Emissions Compliance — ECA & CII
+
+ECA membership is a point-in-polygon test against IMO Emission Control Area boundaries; legs inside an ECA are flagged for compliant fuel-type use. CII is tracked cumulatively across the voyage:
+
+E_total = Σ F̂_rate × Δdist × 3.114   [kg CO₂, HFO conversion factor]
+
+CII_attained = E_total / (DWT × D_total)
+
+If CII_attained is projected to exceed the vessel's required band at the current pace, the check flags a voyage-wide (not single-leg) speed reduction recommendation.
+
+8. Rolling Horizon Re-Routing
+
+8.1 Trigger Conditions
+
+Scheduled 6-hourly ERA5/CMEMS forecast refresh
+
+AIS-observed position deviates from the planned waypoint by more than ~10 NM
+
+A new dynamic no-go zone (§5.2) intersects the remaining planned route
+
+8.2 Procedure
+
+Snapshot current AIS state (lat, lon, SOG, COG, t_now) as the new origin
+
+Re-fetch the latest ERA5/CMEMS forecast cycle
+
+Reset the elapsed-time baseline: T_elapsed = 0 at the new origin, t_now
+
+Re-run the dynamic filter (§5.2) over the remaining region — the static filter (§5.1) is cached and reused unchanged
+
+Re-run the 4D-MODIP wavefront search (§6) from the new origin to the fixed destination
+
+Re-run the safety & compliance checks (§7) on the newly proposed remaining route
+
+Splice the already-sailed portion of the route with the newly computed remaining portion
+
+Publish the updated route and log the delta against the previous plan for audit
+
+9. Final Route Output Schema
+
+Because §6.5 can terminate with several non-dominated routes, the output is a small labeled set (typically 1–3 routes — e.g. FASTEST, CHEAPEST, MOST_COMFORTABLE) rather than a single record. Each route contains a per-waypoint list plus a summary.
+
+Per-waypoint record:
+
+Field
+
+Type
+
+Description
+
+lat, lon
+
+float, float
+
+Waypoint coordinates
+
+eta
+
+datetime
+
+Predicted arrival time at this waypoint
+
+heading
+
+float (deg)
+
+Recommended course
+
+speed
+
+float (kn)
+
+Recommended speed over ground, V_stw − ΔV̂
+
+fuel_leg_kg
+
+float
+
+Predicted fuel burn for this leg, F̂_rate × Δdist
+
+resistance_kN
+
+float
+
+Predicted wave + wind drag, R̂_wave + R̂_wind
+
+roll_risk, slam_force, comfort_index, green_water_risk, prop_emergence_risk
+
+float / float / float / float / float
+
+Directly from §3.4, q3/q4/q6/q7/q8
+
+confidence
+
+float [0,1]
+
+§3.4, q9 — low values indicate an out-of-distribution weather state
+
+safety_flag
+
+enum
+
+OK / PARAMETRIC_ROLL_RISK / COMFORT_LIMIT / ECA
+
+source
+
+enum
+
+MODEL / FALLBACK_HOLTROP — see §10
+
+Plus, per route, a summary record: total distance (NM), total fuel (t), total time (hr), attained CII estimate, a route label (FASTEST / CHEAPEST / MOST_COMFORTABLE / …), and the timestamp of the last rolling-horizon update.
+
+10. Edge Cases & Fallback Protocols
+
+Case
+
+Risk
+
+Mitigation
+
+Upstream ẓ dimension changes
+
+Adapter shape mismatch at load time
+
+Adapter input size is read from a versioned config; on mismatch, log a warning and retrain only the adapter, not the quantum layer
+
+Encoding saturation / vanishing gradients
+
+tanh squashing flattens gradients for large L
+
+Monitor gradient variance during training; if flattening appears, reduce ansatz depth L or add a classical skip connection from ẓ_proj directly into the readout head
+
+Weather feed outage (upstream DEGRADED_MODE flag)
+
+No CNN/MLP output available
+
+Bypass §3 entirely; use calm-water Holtrop-Mennen values directly as the edge cost until the feed reconnects
+
+Query time beyond forecast horizon (>72 h out)
+
+No valid forecast slice for t_query(v)
+
+Fall back to monthly climatological averages for that region/season rather than extrapolating the last known forecast
+
+No feasible path (dynamic no-go zones block all corridors)
+
+Search returns no route
+
+Relax the dynamic threshold (§5.2) by a configurable margin once, and flag the resulting route ELEVATED_RISK for operator review — never fail silently
+
+11. Complete Pipeline Summary
+
+Step
+
+Module type
+
+Runs
+
+Depends on
+
+Feature augmentation (θ_enc)
+
+Deterministic formula
+
+Every edge query
+
+ẓ_fusion
+
+Adapter layer
+
+Classical NN (trained)
+
+Every edge query
+
+ẓ_input
+
+Quantum encoding + ansatz + measurement
+
+Simulated quantum (trained via backprop)
+
+Every edge query
+
+ẓ_proj
+
+Static hard filter
+
+Deterministic, zero-AI
+
+Once per region, cached
+
+GEBCO, GSHHG
+
+Dynamic no-go gate
+
+Deterministic, zero-AI
+
+Every forecast cycle
+
+ERA5/CMEMS (reused from CNN)
+
+4D-MODIP wavefront + Pareto pruning
+
+Classical algorithm (multi-objective)
+
+Every (re-)planning cycle
+
+Cost model + both filters
+
+Safety & compliance checks
+
+Deterministic formulas
+
+On the returned route
+
+Route + vessel stability data
+
+Rolling horizon update
+
+Orchestration loop
+
+Every 6 h or on trigger
+
+AIS + new forecast
+
+Final route output
+
+Schema / interface
+
+Every (re-)planning cycle
+
+All of the above
+

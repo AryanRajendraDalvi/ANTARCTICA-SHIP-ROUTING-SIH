@@ -1,0 +1,349 @@
+{
+  "dataset_name": "GSHHG (Global Self-consistent, Hierarchical, High-resolution Geography Database)",
+  "file_name": "GSHHS_i_L1.shp",
+  "file_path": "d:\\downloads\\SMART INDIA HACKATHON 2026\\GSHHS_i_L1.shp",
+  "file_size_bytes": 7284324,
+  "file_size_mb": 6.95,
+  "number_of_features": 32830,
+  "geometry_type": "Polygon (Shapefile Type 5)",
+  "crs_projection": {
+    "name": "WGS 84 (World Geodetic System 1984)",
+    "epsg": 4326,
+    "unit": "Decimal Degrees (Longitude, Latitude)",
+    "prj_file_present": false,
+    "standard_specification": "GSHHG global vector coastline database is natively defined in Geographic WGS84 coordinates."
+  },
+  "bounding_box_extent": {
+    "min_longitude": -180.0,
+    "min_latitude": -68.919814,
+    "max_longitude": 180.0,
+    "max_latitude": 83.633389,
+    "formatted": "West -180.0000\u00b0, South -68.9198\u00b0, East 180.0000\u00b0, North 83.6334\u00b0"
+  },
+  "attribute_columns": {
+    "fields_in_dbf": [],
+    "has_attribute_table": false,
+    "description": "Standalone .shp geometry file containing 32,830 polygon boundaries (Level 1: Shorelines dividing ocean and land/islands). No separate .dbf attribute table is present."
+  },
+  "geometry_summary": {
+    "total_polygons": 32830,
+    "total_parts": 32830,
+    "total_vertices": 340359,
+    "min_vertices_per_polygon": 4,
+    "max_vertices_per_polygon": 34332,
+    "median_vertices_per_polygon": 4,
+    "avg_vertices_per_polygon": 10.37
+  },
+  "regional_breakdown": {
+    "Indian Ocean Basin (Broad: 30E-120E, 50S-30N)": {
+      "description": "Broad Indian Ocean basin from East Africa to Western Australia, 50S to 30N",
+      "bounding_box": [
+        30.0,
+        -50.0,
+        120.0,
+        30.0
+      ],
+      "overlapping_polygon_count": 4714,
+      "sample_features": [
+        {
+          "id": 0,
+          "bbox": [
+            -9.5004,
+            1.2695,
+            180.0,
+            77.7196
+          ],
+          "points": 34332
+        },
+        {
+          "id": 2,
+          "bbox": [
+            -17.5338,
+            -34.8304,
+            51.4154,
+            37.3496
+          ],
+          "points": 6675
+        },
+        {
+          "id": 5,
+          "bbox": [
+            113.1529,
+            -39.1396,
+            153.6396,
+            -10.6887
+          ],
+          "points": 6844
+        },
+        {
+          "id": 8,
+          "bbox": [
+            108.8446,
+            -4.1846,
+            119.2746,
+            7.0345
+          ],
+          "points": 1659
+        },
+        {
+          "id": 9,
+          "bbox": [
+            43.2213,
+            -25.6062,
+            50.4837,
+            -11.9512
+          ],
+          "points": 1384
+        }
+      ]
+    },
+    "North Indian Ocean (45E-100E, 0N-30N)": {
+      "description": "North Indian Ocean including Arabian Sea, Bay of Bengal, and adjacent coasts",
+      "bounding_box": [
+        45.0,
+        0.0,
+        100.0,
+        30.0
+      ],
+      "overlapping_polygon_count": 1483,
+      "sample_features": [
+        {
+          "id": 0,
+          "bbox": [
+            -9.5004,
+            1.2695,
+            180.0,
+            77.7196
+          ],
+          "points": 34332
+        },
+        {
+          "id": 2,
+          "bbox": [
+            -17.5338,
+            -34.8304,
+            51.4154,
+            37.3496
+          ],
+          "points": 6675
+        },
+        {
+          "id": 11,
+          "bbox": [
+            95.1946,
+            -5.9454,
+            106.0871,
+            5.6604
+          ],
+          "points": 966
+        },
+        {
+          "id": 30,
+          "bbox": [
+            79.6954,
+            5.9146,
+            81.8804,
+            9.8321
+          ],
+          "points": 348
+        },
+        {
+          "id": 134,
+          "bbox": [
+            97.0596,
+            0.5442,
+            97.9272,
+            1.5421
+          ],
+          "points": 78
+        }
+      ]
+    },
+    "Arabian Sea (50E-77.5E, 5N-26N)": {
+      "description": "Arabian Sea (Somalia, Oman, Gulf entrance, Pakistan, West Coast of India, Lakshadweep)",
+      "bounding_box": [
+        50.0,
+        5.0,
+        77.5,
+        26.0
+      ],
+      "overlapping_polygon_count": 348,
+      "sample_features": [
+        {
+          "id": 0,
+          "bbox": [
+            -9.5004,
+            1.2695,
+            180.0,
+            77.7196
+          ],
+          "points": 34332
+        },
+        {
+          "id": 2,
+          "bbox": [
+            -17.5338,
+            -34.8304,
+            51.4154,
+            37.3496
+          ],
+          "points": 6675
+        },
+        {
+          "id": 145,
+          "bbox": [
+            53.3062,
+            12.3038,
+            54.5421,
+            12.7112
+          ],
+          "points": 41
+        },
+        {
+          "id": 382,
+          "bbox": [
+            58.6212,
+            20.1587,
+            58.9587,
+            20.6912
+          ],
+          "points": 24
+        },
+        {
+          "id": 431,
+          "bbox": [
+            50.4487,
+            25.7912,
+            50.6346,
+            26.2412
+          ],
+          "points": 27
+        }
+      ]
+    },
+    "Bay of Bengal (77.5E-100E, 5N-23N)": {
+      "description": "Bay of Bengal (East Coast of India, Sri Lanka East, Bangladesh, Myanmar, Andaman & Nicobar)",
+      "bounding_box": [
+        77.5,
+        5.0,
+        100.0,
+        23.0
+      ],
+      "overlapping_polygon_count": 857,
+      "sample_features": [
+        {
+          "id": 0,
+          "bbox": [
+            -9.5004,
+            1.2695,
+            180.0,
+            77.7196
+          ],
+          "points": 34332
+        },
+        {
+          "id": 11,
+          "bbox": [
+            95.1946,
+            -5.9454,
+            106.0871,
+            5.6604
+          ],
+          "points": 966
+        },
+        {
+          "id": 30,
+          "bbox": [
+            79.6954,
+            5.9146,
+            81.8804,
+            9.8321
+          ],
+          "points": 348
+        },
+        {
+          "id": 235,
+          "bbox": [
+            92.6937,
+            12.2945,
+            92.9912,
+            12.9237
+          ],
+          "points": 73
+        },
+        {
+          "id": 249,
+          "bbox": [
+            92.7946,
+            12.8803,
+            93.0963,
+            13.5746
+          ],
+          "points": 108
+        }
+      ]
+    },
+    "India Coastal & EEZ Zone (68E-94E, 6N-24N)": {
+      "description": "Immediate waters around mainland India, Lakshadweep, Andaman & Nicobar",
+      "bounding_box": [
+        68.0,
+        6.0,
+        94.0,
+        24.0
+      ],
+      "overlapping_polygon_count": 512,
+      "sample_features": [
+        {
+          "id": 0,
+          "bbox": [
+            -9.5004,
+            1.2695,
+            180.0,
+            77.7196
+          ],
+          "points": 34332
+        },
+        {
+          "id": 30,
+          "bbox": [
+            79.6954,
+            5.9146,
+            81.8804,
+            9.8321
+          ],
+          "points": 348
+        },
+        {
+          "id": 235,
+          "bbox": [
+            92.6937,
+            12.2945,
+            92.9912,
+            12.9237
+          ],
+          "points": 73
+        },
+        {
+          "id": 249,
+          "bbox": [
+            92.7946,
+            12.8803,
+            93.0963,
+            13.5746
+          ],
+          "points": 108
+        },
+        {
+          "id": 254,
+          "bbox": [
+            92.5212,
+            11.4729,
+            92.7979,
+            12.2395
+          ],
+          "points": 86
+        }
+      ]
+    }
+  }
+}
